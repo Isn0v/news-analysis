@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: strongpassword
+      POSTGRES_DB: crypto_news
+    volumes:
+      - ./postgres/pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  go-collector:
+    build: ./go-collector
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: strongpassword
+      POSTGRES_DB: crypto_news
+    depends_on:
+      - db
+    restart: always
+
+  # python-ml:
+  #   build: ./ml-python
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - "8000:8000"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+
+volumes:
+  pgdata:
