@@ -10,7 +10,6 @@ import (
 )
 
 // InitDB подключается к PostgreSQL и создаёт таблицу raw_news, если её нет.
-// Колонка url имеет ограничение UNIQUE — это главный инструмент дедупликации.
 func InitDB() *sql.DB {
 	host := os.Getenv("POSTGRES_HOST")
 	port := os.Getenv("POSTGRES_PORT")
@@ -32,16 +31,29 @@ func InitDB() *sql.DB {
 
 	createTableQuery := `
 	CREATE TABLE IF NOT EXISTS raw_news (
-		id           SERIAL PRIMARY KEY,
+		id            SERIAL PRIMARY KEY,
+		guid          TEXT,
 		timestamp_utc TIMESTAMP NOT NULL,
-		source       VARCHAR(100) NOT NULL,
-		author       TEXT,
-		title        TEXT NOT NULL,
-		url          TEXT NOT NULL UNIQUE,
-		description  TEXT,
-		content      TEXT NOT NULL,
-		created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);`
+		source        VARCHAR(100) NOT NULL,
+		authors       TEXT[],
+		title         TEXT NOT NULL,
+		url           TEXT NOT NULL UNIQUE,
+		image_url     TEXT,
+		categories    TEXT[],
+		description   TEXT,
+		content       TEXT NOT NULL,
+
+		-- Поля для LLM-пайплайна
+		processed     BOOLEAN DEFAULT FALSE,
+		processed_at  TIMESTAMP,
+		llm_result    JSONB,
+
+		created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Индекс для быстрой выборки необработанных новостей LLM-сервисом
+	CREATE INDEX IF NOT EXISTS idx_raw_news_unprocessed
+		ON raw_news (processed) WHERE processed = FALSE;`
 
 	if _, err = db.Exec(createTableQuery); err != nil {
 		log.Fatalf("Ошибка создания таблицы: %v", err)
