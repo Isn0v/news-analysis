@@ -1,1 +1,3 @@
-select * from raw_news;
+SELECT *
+FROM raw_news
+ORDER BY timestamp_utc DESC;

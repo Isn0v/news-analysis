@@ -1,8 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -12,16 +14,19 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-// NewsItem — строгая схема для хранения сырых записей из RSS.
+// NewsItem — полная схема данных, извлекаемых из RSS.
 type NewsItem struct {
 	GUID         string
-	TimestampUTC string
-	Source       string
-	Authors      []string // все соавторы статьи
+	URL          string   // нормализованный URL без UTM-параметров
+	TimestampUTC string   // дата публикации (pubDate)
+	UpdatedAtUTC string   // дата редактирования (atom:updated), может быть пустой
+	Source       string   // наш идентификатор источника ("coindesk")
+	OriginSource string   // оригинальный издатель из <source> (Yahoo Finance)
+	OriginURL    string   // URL оригинального издателя
+	Authors      []string // все соавторы
 	Title        string
-	URL          string
 	ImageURL     string
-	Categories   []string // теги и категории от редакции
+	Categories   []string
 	Description  string
 	Content      string
 }
@@ -32,25 +37,68 @@ type rssSource struct {
 	URL  string
 }
 
-// sources — список всех RSS-лент. Добавь сюда новые источники по мере необходимости.
+// sources — список только тех RSS-лент, которые отдают 100% полный текст статьи (content:encoded).
+// Урезанные источники (CoinDesk, The Defiant, Cointelegraph, Yahoo, Vitalik) исключены.
+// Проверено live-запросами: минимум 4000 символов в content:encoded на первую статью.
 var sources = []rssSource{
-	{Name: "the_defiant", URL: "https://thedefiant.io/feed/"},
-	{Name: "coindesk", URL: "https://www.coindesk.com/arc/outboundfeeds/rss/"},
-	// {Name: "cointelegraph", URL: "https://cointelegraph.com/rss"},
-	// {Name: "decrypt",     URL: "https://decrypt.co/feed"},
+	// Проверенные крипто-медиа с полным текстом (проверено live)
+	{Name: "bitcoin_magazine", URL: "https://bitcoinmagazine.com/feed"},      // ~4 000 chars
+	{Name: "bitcoinist",       URL: "https://bitcoinist.com/feed/"},           // ~5 800 chars
+	{Name: "cryptopotato",     URL: "https://cryptopotato.com/feed/"},        // ~7 900 chars
+	{Name: "cryptonews",       URL: "https://cryptonews.com/news/feed/"},     // ~8 700 chars
+	{Name: "cryptoslate",      URL: "https://cryptoslate.com/feed/"},         // ~7 000 chars
+	{Name: "smartliquidity",   URL: "https://smartliquidity.info/feed/"},     // ~19 100 chars
+	{Name: "cryptobreaking",   URL: "https://www.cryptobreaking.com/feed/"}, // ~7 700 chars
+	{Name: "beincrypto",       URL: "https://beincrypto.com/feed/"},          // ~14 100 chars
+	{Name: "newsbtc",          URL: "https://www.newsbtc.com/feed/"},         // ~4 500 chars
+	{Name: "coinjournal",      URL: "https://coinjournal.net/feed/"},         // ~5 500 chars
+	{Name: "finbold",          URL: "https://finbold.com/feed/"},             // ~5 000 chars
+
+	// Авторская аналитика / Substack (полный текст подтверждён)
+	{Name: "arthur_hayes", URL: "https://cryptohayes.substack.com/feed"}, // ~72 600 chars
+	{Name: "cobie",        URL: "https://cobie.substack.com/feed"},        // ~87 000 chars
 }
 
-// extractAuthors собирает всех авторов из item.
-// Приоритет: dc:creator (поддерживает несколько), затем item.Authors, затем item.Author.
+// stripUTM удаляет UTM-параметры из URL для надёжной дедупликации.
+// Cointelegraph добавляет ?utm_source=rss_feed&utm_medium=rss в каждую ссылку.
+func stripUTM(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || rawURL == "" {
+		return rawURL
+	}
+	q := u.Query()
+	for key := range q {
+		if strings.HasPrefix(key, "utm_") || key == "yptr" {
+			q.Del(key)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// extractAuthors собирает всех авторов статьи.
+// Порядок приоритетов: dc:creator → item.Authors → item.Author.
+// Для Cointelegraph чистит префикс "Cointelegraph by ".
 func extractAuthors(item *gofeed.Item) []string {
-	// dc:creator — поддерживает несколько авторов (CoinDesk, Cointelegraph)
+	var names []string
+
+	// dc:creator — поддерживает несколько авторов (CoinDesk, CryptoPotato, и др.)
 	if item.DublinCoreExt != nil && len(item.DublinCoreExt.Creator) > 0 {
-		return item.DublinCoreExt.Creator
+		for _, creator := range item.DublinCoreExt.Creator {
+			// Cointelegraph: "Cointelegraph by John Doe" → "John Doe"
+			name := strings.TrimPrefix(creator, "Cointelegraph by ")
+			name = strings.TrimSpace(name)
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 {
+			return names
+		}
 	}
 
-	// item.Authors — стандартное поле Atom
+	// item.Authors — Atom-стандарт
 	if len(item.Authors) > 0 {
-		names := make([]string, 0, len(item.Authors))
 		for _, a := range item.Authors {
 			if a.Name != "" {
 				names = append(names, a.Name)
@@ -61,7 +109,7 @@ func extractAuthors(item *gofeed.Item) []string {
 		}
 	}
 
-	// Fallback на одиночный author
+	// Fallback: одиночный автор
 	if item.Author != nil && item.Author.Name != "" {
 		return []string{item.Author.Name}
 	}
@@ -69,30 +117,30 @@ func extractAuthors(item *gofeed.Item) []string {
 	return nil
 }
 
-// extractImageURL извлекает URL обложки статьи.
-// Проверяет media:content, item.Image и Enclosures.
+// extractImageURL извлекает URL обложки статьи из нескольких возможных мест.
+// Порядок: media:content → media:thumbnail → item.Image → enclosures (только image/*).
 func extractImageURL(item *gofeed.Item) string {
-	// media:content (CoinDesk, The Defiant через media namespace)
 	if mediaExt, ok := item.Extensions["media"]; ok {
-		if contentList, ok := mediaExt["content"]; ok && len(contentList) > 0 {
-			if url, ok := contentList[0].Attrs["url"]; ok && url != "" {
-				return url
+		// media:content
+		if list, ok := mediaExt["content"]; ok && len(list) > 0 {
+			if u := list[0].Attrs["url"]; u != "" {
+				return u
 			}
 		}
 		// media:thumbnail (The Defiant)
-		if thumbList, ok := mediaExt["thumbnail"]; ok && len(thumbList) > 0 {
-			if url, ok := thumbList[0].Attrs["url"]; ok && url != "" {
-				return url
+		if list, ok := mediaExt["thumbnail"]; ok && len(list) > 0 {
+			if u := list[0].Attrs["url"]; u != "" {
+				return u
 			}
 		}
 	}
 
-	// item.Image (стандартное поле RSS)
+	// Стандартное поле RSS
 	if item.Image != nil && item.Image.URL != "" {
 		return item.Image.URL
 	}
 
-	// Enclosures (часто используется для медиафайлов)
+	// Enclosures (только изображения)
 	for _, enc := range item.Enclosures {
 		if strings.HasPrefix(enc.Type, "image/") {
 			return enc.URL
@@ -102,11 +150,40 @@ func extractImageURL(item *gofeed.Item) string {
 	return ""
 }
 
-// fetchRSS парсит RSS-ленту и отправляет новости в канал.
+// extractUpdatedAt извлекает дату последнего редактирования из atom:updated.
+// Уникален для Cointelegraph.
+func extractUpdatedAt(item *gofeed.Item) string {
+	if item.UpdatedParsed != nil {
+		return item.UpdatedParsed.UTC().Format(time.RFC3339)
+	}
+	return ""
+}
+
+// extractOriginSource извлекает оригинального издателя из тега <source>.
+// Используется в Yahoo Finance: <source url="https://pitchbook.com/">Pitchbook</source>
+// gofeed кладёт его в item.Extensions[""]["source"]
+func extractOriginSource(item *gofeed.Item) (name, srcURL string) {
+	if item.Extensions == nil {
+		return "", ""
+	}
+	// Стандартный (без namespace) тег <source> попадает в Extensions под ключом ""
+	if ext, ok := item.Extensions[""]; ok {
+		if sources, ok := ext["source"]; ok && len(sources) > 0 {
+			s := sources[0]
+			return strings.TrimSpace(s.Value), s.Attrs["url"]
+		}
+	}
+	return "", ""
+}
+
+// fetchRSS парсит RSS-ленту источника и отправляет все статьи в канал.
 func fetchRSS(src rssSource, ch chan<- NewsItem, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	fp := gofeed.NewParser()
+	// Некоторые сайты блокируют запросы без User-Agent
+	fp.UserAgent = "Mozilla/5.0 (compatible; news-analysis-bot/1.0)"
+
 	feed, err := fp.ParseURL(src.URL)
 	if err != nil {
 		log.Printf("[%s] Ошибка парсинга RSS: %v\n", src.Name, err)
@@ -115,9 +192,9 @@ func fetchRSS(src rssSource, ch chan<- NewsItem, wg *sync.WaitGroup) {
 
 	count := 0
 	for _, item := range feed.Items {
-		// Полный текст — из content:encoded, если есть; иначе fallback на description
-		content := item.Content
-		if strings.TrimSpace(content) == "" {
+		// Полный текст — content:encoded если есть, иначе description
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
 			content = item.Description
 		}
 
@@ -127,13 +204,22 @@ func fetchRSS(src rssSource, ch chan<- NewsItem, wg *sync.WaitGroup) {
 			publishedAt = item.PublishedParsed.UTC()
 		}
 
+		// Нормализуем URL — убираем UTM-параметры
+		cleanURL := stripUTM(item.Link)
+
+		// Yahoo Finance: <source> tag хранит оригинальное издание
+		originName, originURL := extractOriginSource(item)
+
 		ch <- NewsItem{
 			GUID:         item.GUID,
+			URL:          cleanURL,
 			TimestampUTC: publishedAt.Format(time.RFC3339),
+			UpdatedAtUTC: extractUpdatedAt(item),
 			Source:       src.Name,
+			OriginSource: originName,
+			OriginURL:    originURL,
 			Authors:      extractAuthors(item),
 			Title:        item.Title,
-			URL:          item.Link,
 			ImageURL:     extractImageURL(item),
 			Categories:   item.Categories,
 			Description:  item.Description,
@@ -144,24 +230,33 @@ func fetchRSS(src rssSource, ch chan<- NewsItem, wg *sync.WaitGroup) {
 	fmt.Printf("[%s] Получено %d записей\n", src.Name, count)
 }
 
+// nullableString возвращает sql.NullString из строки (пустая → NULL в БД).
+func nullableString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
+}
+
 func main() {
 	db := database.InitDB()
 	defer db.Close()
 
-	// INSERT ... ON CONFLICT DO NOTHING — дедупликация по уникальному url.
-	// pq.Array() используется для сохранения []string как PostgreSQL TEXT[].
 	insertQuery := `
-		INSERT INTO raw_news
-			(guid, timestamp_utc, source, authors, title, url, image_url, categories, description, content)
-		VALUES
-			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO raw_news (
+			guid, url, timestamp_utc, updated_at_utc,
+			source, origin_source, origin_url,
+			authors, title, image_url, categories,
+			description, content
+		) VALUES (
+			$1, $2, $3, $4,
+			$5, $6, $7,
+			$8, $9, $10, $11,
+			$12, $13
+		)
 		ON CONFLICT (url) DO NOTHING`
 
-	// Функция одного цикла сбора
 	runCollection := func() {
 		fmt.Println("[Collector] Запуск цикла сбора...")
 
-		ch := make(chan NewsItem, 100)
+		ch := make(chan NewsItem, 200)
 		var wg sync.WaitGroup
 
 		for _, src := range sources {
@@ -169,7 +264,6 @@ func main() {
 			go fetchRSS(src, ch, &wg)
 		}
 
-		// Закрываем канал, когда все горутины завершат работу
 		go func() {
 			wg.Wait()
 			close(ch)
@@ -178,14 +272,17 @@ func main() {
 		saved, skipped := 0, 0
 		for item := range ch {
 			result, err := db.Exec(insertQuery,
-				item.GUID,
-				item.TimestampUTC,
-				item.Source,
-				pq.Array(item.Authors),     // []string → TEXT[]
-				item.Title,
+				nullableString(item.GUID),
 				item.URL,
-				item.ImageURL,
-				pq.Array(item.Categories), // []string → TEXT[]
+				item.TimestampUTC,
+				nullableString(item.UpdatedAtUTC),
+				item.Source,
+				nullableString(item.OriginSource),
+				nullableString(item.OriginURL),
+				pq.Array(item.Authors),
+				item.Title,
+				nullableString(item.ImageURL),
+				pq.Array(item.Categories),
 				item.Description,
 				item.Content,
 			)
@@ -198,16 +295,16 @@ func main() {
 				saved++
 				fmt.Printf("[DB] Сохранено: [%s] %s\n", item.Source, item.Title)
 			} else {
-				skipped++ // Новость уже была в базе
+				skipped++
 			}
 		}
 		fmt.Printf("[Collector] Цикл завершён: сохранено %d, пропущено (дубли) %d\n", saved, skipped)
 	}
 
-	// Первый запуск немедленно
+	// Первый запуск сразу при старте
 	runCollection()
 
-	// Опрос источников каждые 5 минут
+	// Опрос каждые 5 минут
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
