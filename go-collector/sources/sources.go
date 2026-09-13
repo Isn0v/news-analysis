@@ -16,6 +16,13 @@ var Active = []model.Source{
 	{Name: "newsbtc",          URL: "https://www.newsbtc.com/feed/"},         // ~4 500 chars
 	{Name: "coinjournal",      URL: "https://coinjournal.net/feed/"},         // ~5 500 chars
 	{Name: "finbold",          URL: "https://finbold.com/feed/"},             // ~5 000 chars
+	{Name: "dailyhodl",        URL: "https://dailyhodl.com/feed/"},           // ~5 300 chars
+	{Name: "blockonomi",       URL: "https://blockonomi.com/feed/"},          // ~7 400 chars
+	{Name: "protos",           URL: "https://protos.com/feed/"},              // ~9 100 chars
+	{Name: "coinspeaker",      URL: "https://coinspeaker.com/feed/"},         // ~7 900 chars
+	{Name: "captainaltcoin",   URL: "https://captainaltcoin.com/feed/"},      // ~16 300 chars
+	{Name: "zycrypto",         URL: "https://zycrypto.com/feed/"},            // ~5 400 chars
+	{Name: "nulltx",           URL: "https://nulltx.com/feed/"},              // ~9 700 chars
 
 	// Авторские лонгриды / Substack (глубокая аналитика)
 	{Name: "arthur_hayes", URL: "https://cryptohayes.substack.com/feed"}, // ~72 600 chars

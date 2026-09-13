@@ -17,7 +17,7 @@ import (
 
 const (
 	pollInterval = 5 * time.Minute
-	channelSize  = 250
+	channelSize  = 500
 )
 
 func main() {
