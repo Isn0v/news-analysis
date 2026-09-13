@@ -1,4 +1,4 @@
-agy-conv*
+**/agy-conv*
 postgres
 .env
 .vscode
