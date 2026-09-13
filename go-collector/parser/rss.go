@@ -119,7 +119,7 @@ func FetchFeed(src model.Source, ch chan<- model.NewsItem, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	fp := gofeed.NewParser()
-	fp.UserAgent = "Mozilla/5.0 (compatible; news-analysis-bot/1.0)"
+	fp.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
 	feed, err := fp.ParseURL(src.URL)
 	if err != nil {
