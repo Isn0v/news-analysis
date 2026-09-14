@@ -1,6 +1,6 @@
 **/agy-conv*
 postgres
-.env
+**/.env
 .vscode
 
 go-collector/vendor

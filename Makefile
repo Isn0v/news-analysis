@@ -15,3 +15,8 @@ stop:
 ## vendor: обновить vendor/ для go-collector
 vendor:
 	cd go-collector && go mod tidy && go mod vendor
+
+## llm-run: запустить воркер анализа сентимента через uv
+llm-run:
+	cd llm && uv run python main.py
+

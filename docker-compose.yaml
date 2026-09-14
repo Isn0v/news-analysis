@@ -22,19 +22,26 @@ services:
       - db
     restart: always
 
-  # python-ml:
-  #   build: ./ml-python
-  #   depends_on:
-  #     - db
-  #   ports:
-  #     - "8000:8000"
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: all
-  #             capabilities: [gpu]
+  llm:
+    build: ./llm
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: strongpassword
+      POSTGRES_DB: crypto_news
+      LLM_API_KEY: ${LLM_API_KEY:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-r1:14b}
+      BATCH_SIZE: ${BATCH_SIZE:-3}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-10}
+      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-2}
+      MAX_CONTENT_CHARS: ${MAX_CONTENT_CHARS:-6000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    restart: always
 
 volumes:
   pgdata:
