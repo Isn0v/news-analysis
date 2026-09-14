@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Настройки LLM-провайдера (Ollama / DeepSeek / OpenAI)
     llm_api_key: str = "ollama"
-    llm_base_url: str = "http://localhost:11434/v1"
+    llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_model: str = "deepseek-r1:14b"
     llm_temperature: float = 0.1
     llm_num_ctx: int = 16384

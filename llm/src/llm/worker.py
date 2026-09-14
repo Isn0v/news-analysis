@@ -82,13 +82,14 @@ class SentimentWorker:
                 await self.db.save_llm_result(news_id=news_id, result=result)
 
                 logger.info(
-                    "✅ [ID %d | %s] '%s' -> Скор: %+.2f (%s) | Влияние: %d/10 | Канал: %s",
+                    "✅ [ID %d | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
                     news_id,
                     source,
-                    title[:40],
+                    title[:35],
                     result.sentiment_score,
                     result.sentiment_label.value,
-                    result.impact_magnitude,
+                    result.target_horizon_hours,
+                    "Да" if result.is_mean_reverting else "Нет",
                     result.transmission_channel.value,
                 )
                 return True

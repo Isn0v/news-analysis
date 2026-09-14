@@ -91,6 +91,15 @@ class SentimentAnalysisResult(BaseModel):
         default_factory=list,
         description="2-3 ключевых факта или вывода из новости"
     )
+    target_horizon_hours: int = Field(
+        default=4,
+        ge=1, le=720,
+        description="Ожидаемый горизонт в часах, на котором влияние новости максимально (напр. 1, 2, 4, 24, 72)"
+    )
+    is_mean_reverting: bool = Field(
+        default=False,
+        description="Ожидается ли откат/поглощение первичного импульса назад (True для слухов/FUD/колонок мнений, False для фундаментальных фактов и хаков)"
+    )
     reasoning: str = Field(
         description="Экономическое обоснование (Chain-of-Thought): почему и по какому механизму новость влияет на рынок"
     )

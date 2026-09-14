@@ -20,6 +20,11 @@ vendor:
 llm-run:
 	cd llm && uv run python main.py
 
+## llm-reset: сбросить статус обработки новостей и подготовить к повторному инференсу
+llm-reset:
+	docker compose exec -T db psql -U trader -d crypto_news -c "UPDATE raw_news SET processed = FALSE, processed_at = NULL, llm_result = NULL; TRUNCATE TABLE news_market_impact;"
+
+
 ## eval-run: запустить демон оценки рыночного влияния через uv
 eval-run:
 	cd market-evaluator && uv run python main.py
