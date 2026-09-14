@@ -3,7 +3,7 @@
 from pathlib import Path
 
 # Директория со всеми sql-файлами сервиса
-SQL_DIR = Path(__file__).resolve().parent.parent.parent / "sql"
+SQL_DIR = Path(__file__).resolve().parent / "sql"
 
 
 def _read_sql_file(filename: str) -> str:

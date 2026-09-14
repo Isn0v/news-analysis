@@ -3,8 +3,8 @@
 import logging
 from datetime import datetime
 from typing import List, Optional, Tuple
-from market_evaluator.config import settings
-from market_evaluator.models import Candle, EventStudyMetrics
+from config import settings
+from models import Candle, EventStudyMetrics
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from typing import List, Optional
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from market_evaluator.config import settings
-from market_evaluator.models import Candle
+from config import settings
+from models import Candle
 
 logger = logging.getLogger(__name__)
 

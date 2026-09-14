@@ -6,9 +6,9 @@ from typing import List, Dict, Any, Optional
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from market_evaluator.config import settings
-from market_evaluator.models import EventStudyMetrics
-from market_evaluator.queries import (
+from config import settings
+from models import EventStudyMetrics
+from queries import (
     FETCH_UNEVALUATED_NEWS_QUERY,
     SAVE_MARKET_IMPACT_QUERY,
     GET_EVALUATION_STATS_QUERY,

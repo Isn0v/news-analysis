@@ -5,11 +5,11 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 
-from market_evaluator.config import settings
-from market_evaluator.db import DatabaseManager
-from market_evaluator.binance_client import BinanceClient
-from market_evaluator.engine import EventStudyEngine
-from market_evaluator.models import EventStudyMetrics
+from config import settings
+from db import DatabaseManager
+from binance_client import BinanceClient
+from engine import EventStudyEngine
+from models import EventStudyMetrics
 
 logger = logging.getLogger(__name__)
 

@@ -14,9 +14,5 @@ dependencies = [
     "tenacity>=9.1.2",
 ]
 
-[project.scripts]
-llm = "llm:main"
-
-[build-system]
-requires = ["uv_build>=0.12.12,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false

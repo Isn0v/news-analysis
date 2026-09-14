@@ -6,9 +6,9 @@ from typing import Optional
 from openai import AsyncOpenAI, RateLimitError, APIConnectionError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from llm.config import settings
-from llm.schema import SentimentAnalysisResult
-from llm.prompt import SYSTEM_PROMPT, FALLBACK_JSON_INSTRUCTION, build_analysis_user_prompt
+from config import settings
+from schema import SentimentAnalysisResult
+from prompt import SYSTEM_PROMPT, FALLBACK_JSON_INSTRUCTION, build_analysis_user_prompt
 
 logger = logging.getLogger(__name__)
 

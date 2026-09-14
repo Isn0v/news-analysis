@@ -4,9 +4,9 @@ import asyncio
 import logging
 from typing import Dict, Any
 
-from llm.config import settings
-from llm.db import DatabaseManager
-from llm.analyzer import SentimentAnalyzer
+from config import settings
+from db import DatabaseManager
+from analyzer import SentimentAnalyzer
 
 logger = logging.getLogger(__name__)
 

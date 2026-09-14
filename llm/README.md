@@ -12,17 +12,15 @@ llm/
 │   ├── fetch_unprocessed_batch.sql  # Выборка пачки необработанных новостей
 │   ├── save_llm_result.sql          # Сохранение сентимента и обновление флага processed
 │   └── get_table_stats.sql          # Получение общей статистики по таблице
-├── src/
-│   └── llm/
-│       ├── __init__.py
-│       ├── config.py                # Pydantic Settings конфигурация сервиса
-│       ├── schema.py                # Pydantic-модели и Enum'ы сентимента
-│       ├── prompt.py                # Системный промпт финансового аналитика и шаблонизатор
-│       ├── queries.py               # Загрузчик внешних .sql файлов
-│       ├── analyzer.py              # LLM-клиент с обработкой <think> тегов и fallback
-│       ├── db.py                    # Асинхронный пул соединений PostgreSQL (psycopg3 + dict_row)
-│       ├── worker.py                # Демон пакетной обработки с Semaphore
-│       └── main.py                  # Точка входа с обработкой сигналов завершения
+├── main.py                  # Точка входа с обработкой сигналов завершения
+├── analyzer.py              # LLM-клиент с обработкой <think> тегов и fallback
+├── worker.py                # Демон пакетной обработки с Semaphore
+├── db.py                    # Асинхронный пул соединений PostgreSQL (psycopg3 + dict_row)
+├── schema.py                # Pydantic-модели и Enum'ы сентимента
+├── prompt.py                # Системный промпт финансового аналитика и шаблонизатор
+├── config.py                # Pydantic Settings конфигурация сервиса
+├── queries.py               # Загрузчик внешних .sql файлов
+├── __init__.py
 ├── Dockerfile                       # Многослойная сборка на базе python:3.12-slim + uv
 ├── .dockerignore
 ├── .env.example                     # Шаблоны настроек для Ollama, DeepSeek и OpenAI
@@ -35,7 +33,7 @@ llm/
 ## ⚙️ Логика обработки рассуждений DeepSeek-R1
 
 Модели класса DeepSeek-R1 выводят процесс мышления внутри тегов `<think>...</think>`.  
-Модуль `SentimentAnalyzer` ([`analyzer.py`](file:///Users/isnov/git/news-analysis/llm/src/llm/analyzer.py)) реализует двухконтурную схему:
+Модуль `SentimentAnalyzer` ([`analyzer.py`](file:///Users/isnov/git/news-analysis/llm/analyzer.py)) реализует двухконтурную схему:
 
 1. **Контур 1 (Structured Outputs API):**  
    Запрос отправляется через `client.beta.chat.completions.parse()` со строгой схемой `response_format=SentimentAnalysisResult`.  

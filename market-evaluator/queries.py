@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-SQL_DIR = Path(__file__).resolve().parent.parent.parent / "sql"
+SQL_DIR = Path(__file__).resolve().parent / "sql"
 
 
 def _read_sql(filename: str) -> str:

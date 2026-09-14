@@ -1,10 +1,47 @@
+"""Точка входа для запуска сервиса анализа сентимента."""
+
+import asyncio
+import logging
+import signal
 import sys
-from pathlib import Path
 
-# Добавляем директорию src в путь поиска модулей
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+from config import settings
+from worker import SentimentWorker
 
-from llm.main import main
+
+def setup_logging():
+    """Настройка структурированного логирования."""
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+
+
+def main():
+    setup_logging()
+    worker = SentimentWorker()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Регистрация обработчиков сигналов остановки
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, worker.stop)
+        except NotImplementedError:
+            pass
+
+    try:
+        loop.run_until_complete(worker.start())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()
+
 
 if __name__ == "__main__":
     main()

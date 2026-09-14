@@ -5,9 +5,9 @@ from typing import List, Dict, Any, Optional
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from llm.config import settings
-from llm.schema import SentimentAnalysisResult
-from llm.queries import (
+from config import settings
+from schema import SentimentAnalysisResult
+from queries import (
     FETCH_UNPROCESSED_BATCH_QUERY,
     SAVE_LLM_RESULT_QUERY,
     GET_TABLE_STATS_QUERY,

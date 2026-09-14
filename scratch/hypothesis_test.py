@@ -7,13 +7,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT_DIR / "llm" / "src"))
-sys.path.insert(0, str(ROOT_DIR / "market-evaluator" / "src"))
+sys.path.insert(0, str(ROOT_DIR / "llm"))
+from db import DatabaseManager as LLMDb
+from analyzer import SentimentAnalyzer
 
-from llm.db import DatabaseManager as LLMDb
-from llm.analyzer import SentimentAnalyzer
-from market_evaluator.db import DatabaseManager as EvalDb
-from market_evaluator.worker import MarketEvaluationWorker
+sys.path.insert(0, str(ROOT_DIR / "market-evaluator"))
+from worker import MarketEvaluationWorker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
