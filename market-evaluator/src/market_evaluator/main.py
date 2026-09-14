@@ -1,0 +1,97 @@
+"""Точка входа и CLI-интерфейс для сервиса market-evaluator."""
+
+import argparse
+import asyncio
+import logging
+import signal
+import sys
+
+from market_evaluator.config import settings
+from market_evaluator.worker import MarketEvaluationWorker
+
+
+def setup_logging():
+    """Настройка логирования."""
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+
+
+async def async_main():
+    parser = argparse.ArgumentParser(description="Market Evaluator & Event Study CLI")
+    parser.add_argument("--news-id", type=int, help="Оценить конкретную новость по ID")
+    parser.add_argument("--batch", action="store_true", help="Оценить все доступные статьи пачкой")
+    parser.add_argument("--limit", type=int, default=100, help="Лимит статей для пакетного режима")
+    parser.add_argument("--stats", action="store_true", help="Показать статистику точности прогнозов")
+    parser.add_argument("--daemon", action="store_true", help="Запустить в режиме непрерывного демона")
+
+    args = parser.parse_args()
+    setup_logging()
+
+    worker = MarketEvaluationWorker()
+    await worker.initialize()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, worker.stop)
+        except NotImplementedError:
+            pass
+
+    try:
+        if args.stats:
+            stats = await worker.db.get_stats()
+            print("\n" + "=" * 60)
+            print("📊 СТАТИСТИКА ТОЧНОСТИ И РЫНОЧНОГО ВЛИЯНИЯ:")
+            print("=" * 60)
+            for k, v in stats.items():
+                print(f"  {k:25}: {v}")
+            print("=" * 60 + "\n")
+
+        elif args.news_id:
+            print(f"\n🔍 Анализ рыночной реакции для новости ID {args.news_id}...")
+            metrics_list = await worker.evaluate_by_id(args.news_id)
+            if not metrics_list:
+                print("❌ Не удалось рассчитать метрики (проверьте ID новости или наличие тикера).")
+            else:
+                for m in metrics_list:
+                    print("\n" + "-" * 60)
+                    print(f"АКТИВ: {m.symbol} ({m.ticker})")
+                    print(f"Время события (t0):    {m.t0_timestamp} UTC")
+                    print(f"Базовая цена (P0):     ${m.p0_price:,.4f}")
+                    print(f"Pre-News Drift (-4ч):   {m.pre_drift_pct:+.2f}%")
+                    print(f"Всплеск объема на t0:  x{m.volume_surge_ratio:.2f}")
+                    print(f"Доходность +15м:       {f'{m.return_15m_pct:+.2f}%' if m.return_15m_pct is not None else 'N/A'}")
+                    print(f"Доходность +1ч:        {f'{m.return_1h_pct:+.2f}%' if m.return_1h_pct is not None else 'N/A'}")
+                    print(f"Доходность +4ч:        {f'{m.return_4h_pct:+.2f}%' if m.return_4h_pct is not None else 'N/A'}")
+                    print(f"Доходность +24ч:       {f'{m.return_24h_pct:+.2f}%' if m.return_24h_pct is not None else 'N/A'}")
+                    print(f"Макс. взлет (Run-up):  {m.max_runup_pct:+.2f}%")
+                    print(f"Макс. просадка:        {m.max_drawdown_pct:+.2f}%")
+                    print(f"Оценка LLM:            {m.sentiment_label} (скор {m.sentiment_score:+0.2f}, импакт {m.impact_magnitude}/10)")
+                    print(f"Прогноз подтвержден:   1ч: {'✅' if m.is_aligned_1h else '❌'} | 4ч: {'✅' if m.is_aligned_4h else '❌'}")
+                    print("-" * 60)
+
+        elif args.batch:
+            print(f"🚀 Запуск пакетной оценки до {args.limit} новостей...")
+            count = await worker.evaluate_batch_all(limit=args.limit)
+            print(f"✅ Успешно оценено новостей: {count}")
+
+        else:
+            # По умолчанию запускаем демон
+            await worker.start()
+
+    finally:
+        await worker.close()
+
+
+def main():
+    asyncio.run(async_main())
+
+
+if __name__ == "__main__":
+    main()

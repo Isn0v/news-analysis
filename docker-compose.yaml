@@ -46,5 +46,24 @@ services:
       - db
     restart: always
 
+  market-evaluator:
+    build: ./market-evaluator
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: strongpassword
+      POSTGRES_DB: crypto_news
+      BINANCE_BASE_URL: https://api.binance.com
+      PRE_WINDOW_HOURS: 4
+      POST_WINDOW_HOURS: 24
+      CANDLE_INTERVAL: 15m
+      BATCH_SIZE: 5
+      POLL_INTERVAL_SECONDS: 30
+      LOG_LEVEL: INFO
+    depends_on:
+      - db
+    restart: always
+
 volumes:
   pgdata:
