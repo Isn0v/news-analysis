@@ -50,6 +50,8 @@ class MarketEvaluationWorker:
         sentiment_label = llm_result.get("sentiment_label", "neutral")
         sentiment_score = float(llm_result.get("sentiment_score", 0.0))
         impact_magnitude = int(llm_result.get("impact_magnitude", 5))
+        target_horizon_hours = int(llm_result.get("target_horizon_hours", 4))
+        is_mean_reverting = bool(llm_result.get("is_mean_reverting", False))
 
         if not affected_assets:
             logger.debug("У статьи [ID %d] нет затронутых активов", news_id)
@@ -58,7 +60,8 @@ class MarketEvaluationWorker:
         results = []
         t0_ms = int(t0_timestamp.timestamp() * 1000)
         start_ms = t0_ms - (settings.pre_window_hours * 3600 * 1000)
-        end_ms = t0_ms + (settings.post_window_hours * 3600 * 1000)
+        post_hours = max(settings.post_window_hours, target_horizon_hours + 2)
+        end_ms = t0_ms + (post_hours * 3600 * 1000)
 
         for asset in affected_assets:
             ticker = asset.get("ticker", "").strip().upper()
@@ -82,7 +85,7 @@ class MarketEvaluationWorker:
                 logger.warning("Не удалось получить свечи для %s (новость ID %d)", symbol, news_id)
                 continue
 
-            # Расчет метрик
+            # Расчет метрик с учетом горизонта
             metrics = EventStudyEngine.compute(
                 candles=candles,
                 t0_timestamp=t0_timestamp,
@@ -91,21 +94,22 @@ class MarketEvaluationWorker:
                 sentiment_label=sentiment_label,
                 sentiment_score=sentiment_score,
                 impact_magnitude=impact_magnitude,
+                target_horizon_hours=target_horizon_hours,
+                is_mean_reverting=is_mean_reverting,
             )
 
             if metrics:
                 await self.db.save_market_impact(news_id=news_id, metrics=metrics)
                 results.append(metrics)
                 logger.info(
-                    "📊 [ID %d | %s] P0: $%s | Drift: %+0.2f%% | VolSurge: x%0.2f | Ret 1h: %s | Ret 4h: %s | Aligned: %s",
+                    "📊 [ID %d | %s] P0: $%s | VolSurge: x%0.2f | Импульс: %s | Горизонт %dч: %s",
                     news_id,
                     symbol,
                     metrics.p0_price,
-                    metrics.pre_drift_pct,
                     metrics.volume_surge_ratio,
-                    f"{metrics.return_1h_pct:+0.2f}%" if metrics.return_1h_pct is not None else "N/A",
-                    f"{metrics.return_4h_pct:+0.2f}%" if metrics.return_4h_pct is not None else "N/A",
-                    "✅" if metrics.is_aligned_1h else "❌",
+                    "✅" if metrics.is_impulse_confirmed else "❌",
+                    metrics.target_horizon_hours,
+                    "✅" if metrics.is_target_horizon_aligned else "❌",
                 )
 
         return results

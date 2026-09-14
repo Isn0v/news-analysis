@@ -41,8 +41,12 @@ class EventStudyMetrics(BaseModel):
     sentiment_label: str
     sentiment_score: float
     impact_magnitude: int
+    target_horizon_hours: int = 4
+    is_mean_reverting_expected: bool = False
 
     # Согласованность с прогнозом
+    is_impulse_confirmed: Optional[bool] = None
+    is_target_horizon_aligned: Optional[bool] = None
     is_aligned_15m: Optional[bool] = None
     is_aligned_1h: Optional[bool] = None
     is_aligned_4h: Optional[bool] = None

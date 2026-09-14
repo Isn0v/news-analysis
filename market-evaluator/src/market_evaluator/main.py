@@ -71,9 +71,12 @@ async def async_main():
                     print(f"Доходность +4ч:        {f'{m.return_4h_pct:+.2f}%' if m.return_4h_pct is not None else 'N/A'}")
                     print(f"Доходность +24ч:       {f'{m.return_24h_pct:+.2f}%' if m.return_24h_pct is not None else 'N/A'}")
                     print(f"Макс. взлет (Run-up):  {m.max_runup_pct:+.2f}%")
-                    print(f"Макс. просадка:        {m.max_drawdown_pct:+.2f}%")
                     print(f"Оценка LLM:            {m.sentiment_label} (скор {m.sentiment_score:+0.2f}, импакт {m.impact_magnitude}/10)")
-                    print(f"Прогноз подтвержден:   1ч: {'✅' if m.is_aligned_1h else '❌'} | 4ч: {'✅' if m.is_aligned_4h else '❌'}")
+                    print(f"Целевой горизонт LLM:  {m.target_horizon_hours} ч (Откат: {'Да' if m.is_mean_reverting_expected else 'Нет'})")
+                    print(f"Первичный импульс (2ч): {'✅ Сработал' if m.is_impulse_confirmed else '❌ Не сработал'}")
+                    target_status = '✅ Подтвержден' if m.is_target_horizon_aligned else ('❌ Не подтвержден' if m.is_target_horizon_aligned is False else '⏳ В ожидании')
+                    print(f"Целевой горизонт ({m.target_horizon_hours}ч): {target_status}")
+                    print(f"Сетка фикс-горизонтов: 1ч: {'✅' if m.is_aligned_1h else '❌'} | 4ч: {'✅' if m.is_aligned_4h else '❌'}")
                     print("-" * 60)
 
         elif args.batch:
