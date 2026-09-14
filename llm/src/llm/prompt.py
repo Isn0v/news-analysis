@@ -1,5 +1,8 @@
 """Промпты для финансового анализа сентимента новостей."""
 
+from typing import Optional
+from llm.config import settings
+
 SYSTEM_PROMPT = """Ты — ведущий количественный аналитик криптовалютного хедж-фонда и эксперт по финансовому NLP.
 Твоя задача — проанализировать новостную статью или макроэкономический релиз и сформировать строгую, объективную оценку влияния на криптовалютный рынок.
 
@@ -32,16 +35,22 @@ SYSTEM_PROMPT = """Ты — ведущий количественный анал
    - Сформулируй краткую причинно-следственную цепочку (Chain-of-Thought): почему данное событие приводит именно к такому изменению баланса спроса и предложения.
 """
 
+FALLBACK_JSON_INSTRUCTION = (
+    "\nВАЖНО: Выведи ответ строго в формате валидного JSON по заданной схеме. "
+    "Не добавляй вступительного текста."
+)
+
 
 def build_analysis_user_prompt(
     title: str,
     source: str,
     categories: list[str],
     content: str,
-    max_chars: int = 15000
+    max_chars: Optional[int] = None,
 ) -> str:
-    """Формирует пользовательский промпт для анализа статьи."""
-    cleaned_content = content[:max_chars].strip()
+    """Формирует пользовательский промпт для анализа статьи с ограничением длины."""
+    limit = max_chars if max_chars is not None else settings.max_content_chars
+    cleaned_content = content[:limit].strip()
     categories_str = ", ".join(categories) if categories else "Не указаны"
 
     return f"""Проанализируй следующую новость и верни структурированный результат:

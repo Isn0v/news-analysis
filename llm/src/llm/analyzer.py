@@ -1,16 +1,20 @@
 """Клиент для взаимодействия с LLM (DeepSeek / Ollama) и структурированного парсинга."""
 
-import json
 import logging
 import re
+from typing import Optional
 from openai import AsyncOpenAI, RateLimitError, APIConnectionError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from llm.config import settings
 from llm.schema import SentimentAnalysisResult
-from llm.prompt import SYSTEM_PROMPT, build_analysis_user_prompt
+from llm.prompt import SYSTEM_PROMPT, FALLBACK_JSON_INSTRUCTION, build_analysis_user_prompt
 
 logger = logging.getLogger(__name__)
+
+# Регулярные выражения для очистки вывода модели
+THINK_TAG_REGEX = re.compile(r"<think>.*?</think>", re.DOTALL)
+JSON_CODEBLOCK_REGEX = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 
 class SentimentAnalyzer:
@@ -20,13 +24,16 @@ class SentimentAnalyzer:
         self.client = AsyncOpenAI(
             api_key=settings.llm_api_key or "ollama",
             base_url=settings.llm_base_url,
+            timeout=settings.llm_timeout,
         )
         self.model = settings.llm_model
+        self.temperature = settings.llm_temperature
+        self.extra_body = {"options": {"num_ctx": settings.llm_num_ctx}}
 
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
         wait=wait_exponential(multiplier=1, min=2, max=20),
-        stop=stop_after_attempt(4),
+        stop=stop_after_attempt(settings.llm_max_retries),
         reraise=True,
     )
     async def analyze_article(
@@ -56,8 +63,8 @@ class SentimentAnalyzer:
                     {"role": "user", "content": user_prompt},
                 ],
                 response_format=SentimentAnalysisResult,
-                temperature=0.1,
-                extra_body={"options": {"num_ctx": 16384}},
+                temperature=self.temperature,
+                extra_body=self.extra_body,
             )
 
             parsed_result = response.choices[0].message.parsed
@@ -65,24 +72,24 @@ class SentimentAnalyzer:
                 raw_message = response.choices[0].message
                 think_reasoning = getattr(raw_message, "reasoning", None)
                 if think_reasoning and not parsed_result.reasoning:
-                    parsed_result.reasoning = think_reasoning.strip()[:1000]
+                    parsed_result.reasoning = think_reasoning.strip()
                 return parsed_result
 
         except Exception as parse_err:
             logger.warning(
                 "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой <think> тегов...",
-                parse_err
+                parse_err,
             )
 
         # 2. Fallback для моделей, выводящих нестандартный JSON или <think> теги
         raw_response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT + "\nВАЖНО: Выведи ответ строго в формате JSON по заданной схеме."},
+                {"role": "system", "content": SYSTEM_PROMPT + FALLBACK_JSON_INSTRUCTION},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.1,
-            extra_body={"options": {"num_ctx": 16384}},
+            temperature=self.temperature,
+            extra_body=self.extra_body,
         )
 
         content_text = raw_response.choices[0].message.content or ""
@@ -94,10 +101,10 @@ class SentimentAnalyzer:
     def _extract_json_from_text(text: str) -> str:
         """Очищает текст от тегов <think>...</think>, markdown-блоков и извлекает чистый JSON."""
         # Удаляем теги рассуждений DeepSeek <think>...</think>
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        cleaned = THINK_TAG_REGEX.sub("", text).strip()
 
         # Ищем блок markdown ```json ... ```
-        md_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, flags=re.DOTALL)
+        md_match = JSON_CODEBLOCK_REGEX.search(cleaned)
         if md_match:
             return md_match.group(1).strip()
 

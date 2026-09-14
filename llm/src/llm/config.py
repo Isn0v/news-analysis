@@ -16,17 +16,25 @@ class Settings(BaseSettings):
     postgres_user: str = "trader"
     postgres_password: str = "strongpassword"
     postgres_db: str = "crypto_news"
+    db_pool_min_size: int = 1
+    db_pool_max_size: int = 10
 
-    # Настройки LLM-провайдера (по умолчанию локальный DeepSeek-R1 через Ollama)
+    # Настройки LLM-провайдера (Ollama / DeepSeek / OpenAI)
     llm_api_key: str = "ollama"
     llm_base_url: str = "http://localhost:11434/v1"
     llm_model: str = "deepseek-r1:14b"
+    llm_temperature: float = 0.1
+    llm_num_ctx: int = 16384
+    llm_timeout: float = 120.0
+    llm_max_retries: int = 3
 
     # Параметры воркера
-    batch_size: int = 5
+    batch_size: int = 3
     poll_interval_seconds: int = 10
+    error_retry_delay_seconds: int = 5
     max_content_chars: int = 6000  # Ограничение длины статьи для гарантированного вмещения в контекст
     max_concurrent_requests: int = 2  # Параллельных запросов к LLM
+    log_level: str = "INFO"
 
     @property
     def postgres_dsn(self) -> str:

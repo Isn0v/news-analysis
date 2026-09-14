@@ -5,16 +5,19 @@ import logging
 import signal
 import sys
 
+from llm.config import settings
 from llm.worker import SentimentWorker
 
 
 def setup_logging():
     """Настройка структурированного логирования."""
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
     )
 
 
@@ -30,7 +33,6 @@ def main():
         try:
             loop.add_signal_handler(sig, worker.stop)
         except NotImplementedError:
-            # На некоторых платформах (например, Windows) add_signal_handler не поддерживается
             pass
 
     try:
