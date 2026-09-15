@@ -46,7 +46,28 @@ class MarketEvaluationWorker:
         if t0_timestamp.tzinfo is None:
             t0_timestamp = t0_timestamp.replace(tzinfo=timezone.utc)
 
+        # 1. Фильтр спекулятивности: пропускаем мнения, гадания и кликбейт
+        is_speculative = bool(llm_result.get("is_speculative", False))
+        spec_reason = llm_result.get("speculation_reason", "Спекулятивный шум / частное мнение")
+        if is_speculative:
+            logger.info(
+                "⏩ [ID %d | ПРОПУСК] Спекулятивная новость ('%s'). Дальнейший рыночный анализ пропущен.",
+                news_id,
+                spec_reason,
+            )
+            return []
+
         affected_assets = llm_result.get("affected_assets") or []
+        # Fallback: если affected_assets пуст, пробуем извлечь из detected_currencies
+        if not affected_assets:
+            detected_currencies = llm_result.get("detected_currencies") or []
+            sentiment_score = float(llm_result.get("sentiment_score", 0.0))
+            affected_assets = [
+                {"ticker": cur.strip().upper(), "sentiment": sentiment_score, "reason": "Extracted from detected_currencies"}
+                for cur in detected_currencies
+                if cur.strip()
+            ]
+
         sentiment_label = llm_result.get("sentiment_label", "neutral")
         sentiment_score = float(llm_result.get("sentiment_score", 0.0))
         impact_magnitude = int(llm_result.get("impact_magnitude", 5))

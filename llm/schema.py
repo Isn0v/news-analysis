@@ -100,6 +100,22 @@ class SentimentAnalysisResult(BaseModel):
         default=False,
         description="Ожидается ли откат/поглощение первичного импульса назад (True для слухов/FUD/колонок мнений, False для фундаментальных фактов и хаков)"
     )
+    is_speculative: bool = Field(
+        default=False,
+        description="Является ли новость спекулятивной (прогнозы аналитиков, гадания на графиках, кликбейтные заголовки, слухи, субъективные мнения). False — для твердых фактов, регуляторики, эксплойтов, макро-релизов и официальных объявлений."
+    )
+    speculation_reason: str = Field(
+        default="",
+        description="Краткое пояснение (1 предложение): почему новость признана спекулятивной (шум/мнение) или фактологической"
+    )
+    detected_currencies: List[str] = Field(
+        default_factory=list,
+        description="Список тикеров криптовалют (напр. ['BTC', 'ETH', 'SOL', 'XRP']), непосредственно затронутых новостью"
+    )
+    detected_categories: List[str] = Field(
+        default_factory=list,
+        description="Стандартизированные категории новости (напр. ['Macro', 'Regulation', 'DeFi', 'Security/Hack', 'ETF', 'Layer 1', 'Exchange', 'Adoption'])"
+    )
     reasoning: str = Field(
         description="Экономическое обоснование (Chain-of-Thought): почему и по какому механизму новость влияет на рынок"
     )

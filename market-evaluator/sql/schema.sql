@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS news_market_impact (
     is_mean_reverting_expected BOOLEAN,
     is_impulse_confirmed BOOLEAN,
     is_target_horizon_aligned BOOLEAN,
+    is_speculative BOOLEAN DEFAULT FALSE,
     is_aligned_15m BOOLEAN,
     is_aligned_1h BOOLEAN,
     is_aligned_4h BOOLEAN,
