@@ -37,9 +37,15 @@ eval-batch:
 eval-stats:
 	cd market-evaluator && uv run python main.py --stats
 
-## test-collector: запустить тесты go-collector
+## test-collector: запустить тесты go-collector (с цветным выводом)
 test-collector:
-	cd go-collector && go test -v ./...
+	@cd go-collector && if command -v gotestsum >/dev/null 2>&1; then \
+		gotestsum --format testdox; \
+	elif [ -x "$$HOME/go/bin/gotestsum" ]; then \
+		"$$HOME/go/bin/gotestsum" --format testdox; \
+	else \
+		go test -v ./...; \
+	fi
 
 ## test-llm: запустить тесты llm сервиса
 test-llm:
