@@ -27,9 +27,18 @@ CREATE TABLE IF NOT EXISTS raw_news (
 	processed_at   TIMESTAMP,
 	llm_result     JSONB,
 
+	-- Поля для Market Evaluator пайплайна
+	market_evaluated    BOOLEAN DEFAULT FALSE,
+	market_evaluated_at TIMESTAMP,
+
 	created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Частичный индекс для мгновенной выборки необработанных новостей в LLM
 CREATE INDEX IF NOT EXISTS idx_raw_news_unprocessed
 	ON raw_news (timestamp_utc DESC) WHERE processed = FALSE;
+
+-- Частичный индекс для выборки новостей на оценку рыночного влияния
+CREATE INDEX IF NOT EXISTS idx_raw_news_market_unevaluated
+	ON raw_news (timestamp_utc DESC) WHERE processed = TRUE AND market_evaluated = FALSE;
+

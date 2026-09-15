@@ -113,9 +113,23 @@ class DatabaseManager:
                 await cur.execute(SAVE_MARKET_IMPACT_QUERY, params)
                 await conn.commit()
 
+    async def mark_news_evaluated(self, news_id: int):
+        """Помечает новость как оцененную (или проверенную) в raw_news."""
+        query = """
+        UPDATE raw_news
+        SET market_evaluated = TRUE,
+            market_evaluated_at = NOW()
+        WHERE id = %s;
+        """
+        async with self.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(query, (news_id,))
+                await conn.commit()
+
     async def get_stats(self) -> Dict[str, Any]:
         """Возвращает агрегированную аналитику точности и доходностей."""
         async with self.pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(GET_EVALUATION_STATS_QUERY)
                 return await cur.fetchone() or {}
+

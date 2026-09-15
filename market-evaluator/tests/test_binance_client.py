@@ -32,6 +32,27 @@ def test_resolve_symbol():
     assert BinanceClient.resolve_symbol("STABLECOINS") is None
     assert BinanceClient.resolve_symbol("NFT") is None
 
+    # Акции фондового рынка и не-крипто сущности должны отфильтровываться
+    assert BinanceClient.resolve_symbol("AMC") is None
+    assert BinanceClient.resolve_symbol("ROBINHOOD") is None
+    assert BinanceClient.resolve_symbol("HOOD") is None
+    assert BinanceClient.resolve_symbol("ORCL") is None
+    assert BinanceClient.resolve_symbol("TSLA") is None
+
+    # Некорректные составные строки без разделения
+    assert BinanceClient.resolve_symbol("BTC, ETH") is None
+    assert BinanceClient.resolve_symbol("BTC/ETH") is None
+
+
+def test_extract_tickers():
+    """Проверка разделения составных тикеров."""
+    assert BinanceClient.extract_tickers("BTC, ETH") == ["BTC", "ETH"]
+    assert BinanceClient.extract_tickers("SOL/AVAX") == ["SOL", "AVAX"]
+    assert BinanceClient.extract_tickers("$BTC; $ETH") == ["BTC", "ETH"]
+    assert BinanceClient.extract_tickers("BTC") == ["BTC"]
+    assert BinanceClient.extract_tickers("") == []
+
+
 
 @pytest.mark.asyncio
 async def test_fetch_klines_parsing():

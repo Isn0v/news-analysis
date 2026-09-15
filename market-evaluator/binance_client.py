@@ -11,6 +11,8 @@ from models import Candle
 
 logger = logging.getLogger(__name__)
 
+import re
+
 # Популярные исключения и алиасы
 KNOWN_TICKER_MAP = {
     "BTC": "BTCUSDT",
@@ -35,6 +37,14 @@ KNOWN_TICKER_MAP = {
     "MONERO": "XMRUSDT",
 }
 
+# Известные акции, индексы и не-крипто тикеры, которые не торгуются на спотовом Binance
+NON_CRYPTO_BLACKLIST = {
+    "TOTAL_CRYPTO", "GENERAL_CRYPTO", "DEFI", "STABLECOINS", "NFT", "RWA", "MEMES",
+    "AMC", "ROBINHOOD", "HOOD", "ORCL", "ORACLE", "NVDA", "NVIDIA", "MU", "MICRON",
+    "FORD", "F", "AAPL", "APPLE", "TSLA", "TESLA", "MSFT", "MICROSOFT", "GOOG", "GOOGL",
+    "AMZN", "AMAZON", "META", "SPY", "QQQ", "GME", "COIN", "COINBASE", "MSTR",
+}
+
 
 class BinanceClient:
     """Клиент для получения исторических свечей и рыночных данных Binance без API-ключей."""
@@ -51,18 +61,37 @@ class BinanceClient:
         """Закрывает HTTP-сессию."""
         await self.client.aclose()
 
-    @staticmethod
-    def resolve_symbol(ticker: str) -> Optional[str]:
+    @classmethod
+    def extract_tickers(cls, raw_ticker: str) -> List[str]:
+        """Извлекает и разделяет тикеры, если модель вернула объединенную строку (напр. 'BTC, ETH')."""
+        if not raw_ticker:
+            return []
+        parts = [p.strip().upper().replace("$", "") for p in re.split(r"[,/;\s]+", raw_ticker)]
+        return [p for p in parts if p]
+
+    @classmethod
+    def resolve_symbol(cls, ticker: str) -> Optional[str]:
         """Преобразует тикер актива в торговую пару Binance (например, BTC -> BTCUSDT)."""
-        clean = ticker.upper().strip()
+        clean = ticker.upper().strip().replace("$", "")
+
+        # Если строка пустая или содержит пробелы/запятые (неочищенный список)
+        if not clean or " " in clean or "," in clean or "/" in clean:
+            return None
+
         if clean in KNOWN_TICKER_MAP:
             return KNOWN_TICKER_MAP[clean]
-        if clean.endswith("USDT"):
-            return clean
-        # Пропускаем макро-индексы и неконкретные сущности
-        if clean in ("TOTAL_CRYPTO", "GENERAL_CRYPTO", "DEFI", "STABLECOINS", "NFT", "RWA", "MEMES"):
+
+        if clean in NON_CRYPTO_BLACKLIST:
             return None
+
+        if clean.endswith("USDT"):
+            return clean if clean[:-4].isalnum() else None
+
+        if not clean.isalnum():
+            return None
+
         return f"{clean}USDT"
+
 
     @retry(
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),

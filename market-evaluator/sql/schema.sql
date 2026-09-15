@@ -36,3 +36,12 @@ CREATE TABLE IF NOT EXISTS news_market_impact (
 CREATE INDEX IF NOT EXISTS idx_market_impact_news_id ON news_market_impact(news_id);
 CREATE INDEX IF NOT EXISTS idx_market_impact_ticker ON news_market_impact(ticker);
 CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timestamp DESC);
+
+-- Расширение таблицы raw_news для контроля статуса оценки
+ALTER TABLE raw_news ADD COLUMN IF NOT EXISTS market_evaluated BOOLEAN DEFAULT FALSE;
+ALTER TABLE raw_news ADD COLUMN IF NOT EXISTS market_evaluated_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_raw_news_market_unevaluated
+    ON raw_news(timestamp_utc DESC)
+    WHERE processed = TRUE AND market_evaluated = FALSE;
+

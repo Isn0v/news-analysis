@@ -78,56 +78,67 @@ class MarketEvaluationWorker:
         end_ms = t0_ms + (post_hours * 3600 * 1000)
 
         for asset in affected_assets:
-            ticker = asset.get("ticker", "").strip().upper()
-            if not ticker:
+            raw_ticker = asset.get("ticker", "").strip()
+            tickers = BinanceClient.extract_tickers(raw_ticker)
+            if not tickers:
                 continue
 
-            symbol = BinanceClient.resolve_symbol(ticker)
-            if not symbol:
-                logger.debug("Тикер '%s' пропущен (не является торговой парой Binance)", ticker)
-                continue
+            for ticker in tickers:
+                symbol = BinanceClient.resolve_symbol(ticker)
+                if not symbol:
+                    logger.debug("Тикер '%s' пропущен (не является криптовалютной парой Binance)", ticker)
+                    continue
 
-            # Получаем свечи с Binance
-            candles = await self.binance.fetch_klines(
-                symbol=symbol,
-                interval=settings.candle_interval,
-                start_time_ms=start_ms,
-                end_time_ms=end_ms,
-            )
+                try:
+                    # Получаем свечи с Binance
+                    candles = await self.binance.fetch_klines(
+                        symbol=symbol,
+                        interval=settings.candle_interval,
+                        start_time_ms=start_ms,
+                        end_time_ms=end_ms,
+                    )
+                except Exception as e:
+                    logger.warning("Ошибка запроса свечей Binance для %s (новость ID %d): %s", symbol, news_id, e)
+                    continue
 
-            if not candles:
-                logger.warning("Не удалось получить свечи для %s (новость ID %d)", symbol, news_id)
-                continue
+                if not candles:
+                    logger.warning("Не удалось получить свечи для %s (новость ID %d)", symbol, news_id)
+                    continue
 
-            # Расчет метрик с учетом горизонта
-            metrics = EventStudyEngine.compute(
-                candles=candles,
-                t0_timestamp=t0_timestamp,
-                ticker=ticker,
-                symbol=symbol,
-                sentiment_label=sentiment_label,
-                sentiment_score=sentiment_score,
-                impact_magnitude=impact_magnitude,
-                target_horizon_hours=target_horizon_hours,
-                is_mean_reverting=is_mean_reverting,
-                is_speculative=is_speculative,
-            )
-
-            if metrics:
-                await self.db.save_market_impact(news_id=news_id, metrics=metrics)
-                results.append(metrics)
-                type_tag = "🚨 СПЕКУЛЯЦИЯ" if metrics.is_speculative else "🛡 ФАКТ"
-                logger.info(
-                    "📊 [ID %d | %s | %s] P0: $%s | VolSurge: x%0.2f | Импульс: %s | Горизонт %dч: %s",
-                    news_id,
-                    symbol,
-                    type_tag,
-                    metrics.p0_price,
-                    metrics.volume_surge_ratio,
-                    "✅" if metrics.is_impulse_confirmed else "❌",
-                    metrics.target_horizon_hours,
-                    "✅" if metrics.is_target_horizon_aligned else "❌",
+                # Расчет метрик с учетом горизонта
+                metrics = EventStudyEngine.compute(
+                    candles=candles,
+                    t0_timestamp=t0_timestamp,
+                    ticker=ticker,
+                    symbol=symbol,
+                    sentiment_label=sentiment_label,
+                    sentiment_score=sentiment_score,
+                    impact_magnitude=impact_magnitude,
+                    target_horizon_hours=target_horizon_hours,
+                    is_mean_reverting=is_mean_reverting,
+                    is_speculative=is_speculative,
                 )
+
+                if metrics:
+                    await self.db.save_market_impact(news_id=news_id, metrics=metrics)
+                    results.append(metrics)
+                    type_tag = "🚨 СПЕКУЛЯЦИЯ" if metrics.is_speculative else "🛡 ФАКТ"
+                    logger.info(
+                        "📊 [ID %d | %s | %s] P0: $%s | VolSurge: x%0.2f | Импульс: %s | Горизонт %dч: %s",
+                        news_id,
+                        symbol,
+                        type_tag,
+                        metrics.p0_price,
+                        metrics.volume_surge_ratio,
+                        "✅" if metrics.is_impulse_confirmed else "❌",
+                        metrics.target_horizon_hours,
+                        "✅" if metrics.is_target_horizon_aligned else "❌",
+                    )
+
+        # Всегда помечаем новость как оцененную, чтобы исключить зацикливание воркера
+        await self.db.mark_news_evaluated(news_id)
+        if not results:
+            logger.info("ℹ️ [ID %d] Оценка завершена без метрик (активы не торгуются на Binance или нет свечей). Новость помечена обработанной.", news_id)
 
         return results
 
