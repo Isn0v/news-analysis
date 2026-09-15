@@ -36,3 +36,19 @@ eval-batch:
 ## eval-stats: показать статистику точности прогнозов модели
 eval-stats:
 	cd market-evaluator && uv run python main.py --stats
+
+## test-collector: запустить тесты go-collector
+test-collector:
+	cd go-collector && go test -v ./...
+
+## test-llm: запустить тесты llm сервиса
+test-llm:
+	cd llm && uv run pytest -v
+
+## test-eval: запустить тесты market-evaluator
+test-eval:
+	cd market-evaluator && uv run pytest -v
+
+## test: запустить тесты по всем микросервисам
+test: test-collector test-llm test-eval
+

@@ -20,7 +20,7 @@ type Config struct {
 
 // Load загружает переменные среды (с поддержкой локальных .env и ../.env файлов).
 func Load() (*Config, error) {
-	loadEnvFiles(".env", "../.env")
+	loadEnvFiles(".env", "../.env", "../../.env")
 
 	cfg := &Config{
 		PostgresHost:     getEnv("POSTGRES_HOST", "localhost"),
