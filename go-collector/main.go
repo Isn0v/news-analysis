@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Isn0v/news/collector/config"
 	"github.com/Isn0v/news/collector/database"
 	"github.com/Isn0v/news/collector/model"
 	"github.com/Isn0v/news/collector/parser"
@@ -16,12 +17,16 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Minute
-	channelSize  = 500
+	channelSize = 500
 )
 
 func main() {
-	db := database.InitDB()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("[Collector] Ошибка конфигурации: %v", err)
+	}
+
+	db := database.InitDB(cfg)
 	defer db.Close()
 
 	repo := database.NewRepository(db)
@@ -34,10 +39,10 @@ func main() {
 	runCollection(repo)
 
 	// Периодический запуск по таймеру
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
 
-	fmt.Printf("[Collector] Сервис запущен. Периодичность опроса: %v\n", pollInterval)
+	fmt.Printf("[Collector] Сервис запущен. Периодичность опроса: %v\n", cfg.PollInterval)
 
 	for {
 		select {

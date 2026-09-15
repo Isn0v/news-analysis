@@ -2,22 +2,22 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: strongpassword
-      POSTGRES_DB: crypto_news
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_news}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
 
   go-collector:
     build: ./go-collector
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: strongpassword
-      POSTGRES_DB: crypto_news
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_news}
     depends_on:
       - db
     restart: always
@@ -27,19 +27,21 @@ services:
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: strongpassword
-      POSTGRES_DB: crypto_news
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_news}
       LLM_API_KEY: ${LLM_API_KEY:-ollama}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
       LLM_MODEL: ${LLM_MODEL:-deepseek-r1:14b}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
       LLM_NUM_CTX: ${LLM_NUM_CTX:-16384}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-120.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
       BATCH_SIZE: ${BATCH_SIZE:-3}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-10}
       MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-2}
       MAX_CONTENT_CHARS: ${MAX_CONTENT_CHARS:-6000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -51,16 +53,17 @@ services:
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      POSTGRES_USER: trader
-      POSTGRES_PASSWORD: strongpassword
-      POSTGRES_DB: crypto_news
-      BINANCE_BASE_URL: https://api.binance.com
-      PRE_WINDOW_HOURS: 4
-      POST_WINDOW_HOURS: 24
-      CANDLE_INTERVAL: 15m
-      BATCH_SIZE: 5
-      POLL_INTERVAL_SECONDS: 30
-      LOG_LEVEL: INFO
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_news}
+      BINANCE_BASE_URL: ${BINANCE_BASE_URL:-https://api.binance.com}
+      PRE_WINDOW_HOURS: ${PRE_WINDOW_HOURS:-4}
+      POST_WINDOW_HOURS: ${POST_WINDOW_HOURS:-24}
+      CANDLE_INTERVAL: ${CANDLE_INTERVAL:-15m}
+      NEUTRAL_THRESHOLD_PCT: ${NEUTRAL_THRESHOLD_PCT:-0.2}
+      BATCH_SIZE: ${BATCH_SIZE:-5}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-30}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       - db
     restart: always

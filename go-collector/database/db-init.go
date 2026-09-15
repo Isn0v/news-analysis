@@ -4,21 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
+	"github.com/Isn0v/news/collector/config"
 	_ "github.com/lib/pq"
 )
 
-// InitDB подключается к PostgreSQL по переменным окружения и применяет миграцию схемы.
-func InitDB() *sql.DB {
-	host := os.Getenv("POSTGRES_HOST")
-	port := os.Getenv("POSTGRES_PORT")
-	user := os.Getenv("POSTGRES_USER")
-	password := os.Getenv("POSTGRES_PASSWORD")
-	dbname := os.Getenv("POSTGRES_DB")
-
+// InitDB подключается к PostgreSQL по конфигурации и применяет миграцию схемы.
+func InitDB(cfg *config.Config) *sql.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+		cfg.PostgresHost, cfg.PostgresPort, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresDB)
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
@@ -36,3 +30,4 @@ func InitDB() *sql.DB {
 	fmt.Println("[DB] Успешное подключение к PostgreSQL и проверка схемы")
 	return db
 }
+
