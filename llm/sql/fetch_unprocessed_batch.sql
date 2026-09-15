@@ -8,5 +8,5 @@ SELECT
     timestamp_utc
 FROM raw_news
 WHERE processed = FALSE
-ORDER BY timestamp_utc DESC
+ORDER BY timestamp_utc ASC
 LIMIT %s;

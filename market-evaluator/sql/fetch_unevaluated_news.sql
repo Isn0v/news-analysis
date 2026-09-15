@@ -12,6 +12,6 @@ WHERE n.processed = TRUE
       jsonb_array_length(COALESCE(n.llm_result->'affected_assets', '[]'::jsonb)) > 0
       OR jsonb_array_length(COALESCE(n.llm_result->'detected_currencies', '[]'::jsonb)) > 0
   )
-ORDER BY n.timestamp_utc DESC
+ORDER BY n.timestamp_utc ASC
 LIMIT %s;
 
