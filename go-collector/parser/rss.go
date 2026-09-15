@@ -48,17 +48,14 @@ func ExtractAuthors(item *gofeed.Item) []string {
 
 	if len(item.Authors) > 0 {
 		for _, a := range item.Authors {
-			if a.Name != "" {
-				names = append(names, a.Name)
+			name := strings.TrimSpace(a.Name)
+			if name != "" {
+				names = append(names, name)
 			}
 		}
 		if len(names) > 0 {
 			return names
 		}
-	}
-
-	if item.Author != nil && item.Author.Name != "" {
-		return []string{item.Author.Name}
 	}
 
 	return nil
