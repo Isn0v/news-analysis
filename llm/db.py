@@ -1,6 +1,8 @@
 """Асинхронная работа с PostgreSQL для чтения необработанных новостей и записи результатов."""
 
+import json
 import logging
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
@@ -59,6 +61,18 @@ class DatabaseManager:
         async with self.pool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(SAVE_LLM_RESULT_QUERY, (result_json, news_id))
+                await conn.commit()
+
+    async def save_llm_error(self, news_id: int, error_message: str):
+        """Сохраняет статус ошибки для статьи, чтобы избежать бесконечного зацикливания воркера."""
+        error_payload = json.dumps({
+            "error": error_message,
+            "failed_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        async with self.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(SAVE_LLM_RESULT_QUERY, (error_payload, news_id))
                 await conn.commit()
 
     async def get_stats(self) -> Dict[str, int]:

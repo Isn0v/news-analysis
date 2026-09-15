@@ -1,4 +1,4 @@
-"""Pydantic-схемы для структурированного анализа новостного сентимента."""
+"""Pydantic schemas for structured financial news sentiment analysis."""
 
 from enum import Enum
 from typing import List
@@ -12,110 +12,110 @@ class SentimentLabel(str, Enum):
 
 
 class InformationType(str, Enum):
-    HARD_FACT = "hard_fact"              # Свершившееся событие (решение ФРС, взлом, релиз ETF)
-    RUMOR_LEAK = "rumor_leak"            # Слухи, утечки, сообщения анонимных источников
-    OPINION_ANALYSIS = "opinion_analysis" # Авторская колонка, теханализ, мнение аналитика
-    MACRO_RELEASE = "macro_release"      # Официальные макро-данные (CPI, Non-Farm, ставка)
+    HARD_FACT = "hard_fact"              # Confirmed event (Fed rate decision, exploit, ETF approval/launch)
+    RUMOR_LEAK = "rumor_leak"            # Rumors, anonymous sources, leaks
+    OPINION_ANALYSIS = "opinion_analysis" # Op-ed, technical analysis, analyst commentary/forecast
+    MACRO_RELEASE = "macro_release"      # Official macroeconomic data (CPI, Non-Farm Payrolls, FOMC)
 
 
 class MarketSurprise(str, Enum):
-    BETTER_THAN_EXPECTED = "better_than_expected" # Лучше ожиданий рынка
-    WORSE_THAN_EXPECTED = "worse_than_expected"   # Хуже ожиданий рынка
-    IN_LINE = "in_line"                           # В рамках консенсус-прогноза
-    NOT_APPLICABLE = "not_applicable"             # Неприменимо (событие вне прогнозов)
+    BETTER_THAN_EXPECTED = "better_than_expected" # Exceeded market expectations
+    WORSE_THAN_EXPECTED = "worse_than_expected"   # Worse than market expectations
+    IN_LINE = "in_line"                           # Matches consensus forecast
+    NOT_APPLICABLE = "not_applicable"             # Qualitative event without numeric consensus
 
 
 class TransmissionChannel(str, Enum):
-    LIQUIDITY_AND_RATES = "liquidity_and_rates"   # Канал ликвидности (ФРС, ставки, QE/QT, DXY)
-    FIAT_DEBASEMENT = "fiat_debasement"           # Обесценение фиата (инфляция, печать денег, госдолг)
-    GEOPOLITICAL_RISK = "geopolitical_risk"       # Геополитика (войны, санкции, бегство в кэш/золото)
-    REGULATORY = "regulatory"                     # Регулирование (SEC, MiCA, запреты, суды)
-    DEFI_TECH_EXPLOIT = "defi_tech_exploit"       # Эксплойты, безопасность протоколов, форки
-    GENERAL_CRYPTO = "general_crypto"             # Внутренние крипто-новости (листинги, обновления)
+    LIQUIDITY_AND_RATES = "liquidity_and_rates"   # Liquidity channel (Fed, interest rates, QE/QT, DXY)
+    FIAT_DEBASEMENT = "fiat_debasement"           # Currency debasement (inflation, M2 expansion, sovereign debt)
+    GEOPOLITICAL_RISK = "geopolitical_risk"       # Geopolitics (conflicts, sanctions, flight to cash/gold)
+    REGULATORY = "regulatory"                     # Legal & enforcement (SEC, MiCA, court rulings, bans)
+    DEFI_TECH_EXPLOIT = "defi_tech_exploit"       # Exploits, smart contract bugs, bridge hacks, forks
+    GENERAL_CRYPTO = "general_crypto"             # Native crypto ecosystem (listings, tokenomics, mainnet)
     NONE = "none"
 
 
 class TimeHorizon(str, Enum):
-    IMMEDIATE_1H_4H = "immediate_1h_4h"   # Мгновенная реакция стакана
-    SHORT_TERM_1D_3D = "short_term_1d_3d" # Короткий импульс на 1-3 дня
-    MEDIUM_TERM_1W_1M = "medium_term_1w_1m" # Формирование среднесрочного тренда
-    LONG_TERM_MONTHS = "long_term_months" # Фундаментальный сдвиг на месяцы
+    IMMEDIATE_1H_4H = "immediate_1h_4h"   # Instant order book reaction (1-4h)
+    SHORT_TERM_1D_3D = "short_term_1d_3d" # Momentum impulse (1-3 days)
+    MEDIUM_TERM_1W_1M = "medium_term_1w_1m" # Medium-term trend formation (1-4 weeks)
+    LONG_TERM_MONTHS = "long_term_months" # Multi-month structural/fundamental shift
 
 
 class AssetImpact(BaseModel):
     ticker: str = Field(
-        description="Тикер затронутого актива (напр. 'BTC', 'ETH', 'SOL', 'TOTAL_CRYPTO', 'DEFI')"
+        description="Standard ticker of the impacted crypto asset (e.g. 'BTC', 'ETH', 'SOL', 'XRP')"
     )
     sentiment: float = Field(
         ge=-1.0, le=1.0,
-        description="Сентимент конкретно для этого актива от -1.0 (медвежий) до +1.0 (бычий)"
+        description="Asset-specific sentiment score from -1.0 (extremely bearish) to +1.0 (extremely bullish)"
     )
     reason: str = Field(
-        description="Краткое пояснение, почему новость влияет именно так на этот тикер"
+        description="Concise rationale in English explaining why this specific ticker is affected"
     )
 
 
 class SentimentAnalysisResult(BaseModel):
     sentiment_score: float = Field(
         ge=-1.0, le=1.0,
-        description="Общий агрегированный сентимент новости от -1.0 (крайне медвежий) до +1.0 (крайне бычий)"
+        description="Aggregated directional market sentiment score from -1.0 (extremely bearish) to +1.0 (extremely bullish)"
     )
     sentiment_label: SentimentLabel = Field(
-        description="Категориальный сентимент: bullish, bearish или neutral"
+        description="Categorical sentiment label: 'bullish' (score >= 0.10), 'bearish' (score <= -0.10), or 'neutral' (-0.10 < score < 0.10)"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
-        description="Степень уверенности модели в данной оценке (0.0 - 1.0)"
+        description="Model confidence score between 0.0 (uncertain) and 1.0 (high certainty)"
     )
     impact_magnitude: int = Field(
         ge=1, le=10,
-        description="Сила влияния новости на рынок: 1 (незначительный шум) до 10 (рыночный шок уровня краха FTX или одобрения ETF)"
+        description="Market impact intensity scale from 1 (minor local noise) to 10 (market-wide systemic shock like FTX collapse or spot ETF approval)"
     )
     time_horizon: TimeHorizon = Field(
-        description="Ожидаемый временной горизонт воздействия новости на цену"
+        description="Expected primary pricing horizon for this event"
     )
     information_type: InformationType = Field(
-        description="Тип информации: факт, слух, аналитическое мнение или макро-релиз"
+        description="Nature of the report: hard_fact, rumor_leak, opinion_analysis, or macro_release"
     )
     market_surprise: MarketSurprise = Field(
-        description="Фактор неожиданности новости относительно ожиданий рынка"
+        description="Degree of surprise relative to prior market consensus"
     )
     transmission_channel: TransmissionChannel = Field(
-        description="Макро-канал передачи влияния на рынок криптовалют"
+        description="Primary macroeconomic or technical transmission channel into crypto markets"
     )
     affected_assets: List[AssetImpact] = Field(
         default_factory=list,
-        description="Список конкретных тикеров/секторов и персональное влияние новости на них"
+        description="List of specific cryptocurrency tickers directly affected with individual scores and English rationales"
     )
     key_takeaways: List[str] = Field(
         default_factory=list,
-        description="2-3 ключевых факта или вывода из новости"
+        description="2-3 key factual bullet points in English summarizing the core market drivers"
     )
     target_horizon_hours: int = Field(
         default=4,
         ge=1, le=720,
-        description="Ожидаемый горизонт в часах, на котором влияние новости максимально (напр. 1, 2, 4, 24, 72)"
+        description="Hours until maximum price impact is realized (e.g. 1-2h for liquidations/listings, 24h for macro/CPI, 72h+ for regulatory)"
     )
     is_mean_reverting: bool = Field(
         default=False,
-        description="Ожидается ли откат/поглощение первичного импульса назад (True для слухов/FUD/колонок мнений, False для фундаментальных фактов и хаков)"
+        description="True if the price move is expected to quickly fade/mean-revert (typical for rumors, analyst targets, opinions); False for permanent fundamental catalysts"
     )
     is_speculative: bool = Field(
         default=False,
-        description="Является ли новость спекулятивной (прогнозы аналитиков, гадания на графиках, кликбейтные заголовки, слухи, субъективные мнения). False — для твердых фактов, регуляторики, эксплойтов, макро-релизов и официальных объявлений."
+        description="True for speculative noise (price predictions, chart patterns, clickbait, unsubstantiated rumors, op-eds). False for hard factual catalysts (SEC actions, exploits, official macro releases, token listings, mainnet upgrades)"
     )
     speculation_reason: str = Field(
         default="",
-        description="Краткое пояснение (1 предложение): почему новость признана спекулятивной (шум/мнение) или фактологической"
+        description="One concise sentence in English explaining why the news is classified as speculative noise or a hard catalyst"
     )
     detected_currencies: List[str] = Field(
         default_factory=list,
-        description="Список тикеров криптовалют (напр. ['BTC', 'ETH', 'SOL', 'XRP']), непосредственно затронутых новостью"
+        description="List of uppercase crypto tickers mentioned (e.g. ['BTC', 'ETH']). For broad market news use ['BTC']"
     )
     detected_categories: List[str] = Field(
         default_factory=list,
-        description="Стандартизированные категории новости (напр. ['Macro', 'Regulation', 'DeFi', 'Security/Hack', 'ETF', 'Layer 1', 'Exchange', 'Adoption'])"
+        description="Standardized categories selected from: ['Macro', 'Regulation', 'ETF', 'DeFi', 'Security/Hack', 'Layer 1', 'Layer 2', 'Exchange', 'Mining', 'Adoption', 'Tokenomics', 'Derivatives', 'Market Analysis']"
     )
     reasoning: str = Field(
-        description="Экономическое обоснование (Chain-of-Thought): почему и по какому механизму новость влияет на рынок"
+        description="Rigorous Chain-of-Thought economic rationale in English explaining the transmission mechanism to supply, demand, and liquidity"
     )

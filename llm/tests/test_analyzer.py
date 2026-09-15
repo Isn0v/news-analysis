@@ -88,3 +88,63 @@ def test_extract_json_raw_braces():
     assert clean_json.endswith("}")
     obj = SentimentAnalysisResult.model_validate_json(clean_json)
     assert obj.sentiment_label == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_analyze_article_context_overflow_retry(monkeypatch):
+    """Проверка автоматического повтора с укороченным текстом при ошибке превышения контекста."""
+    from unittest.mock import AsyncMock
+    import httpx
+    from openai import BadRequestError
+
+    analyzer = SentimentAnalyzer()
+    calls = []
+
+    async def mock_run_analysis(title, content, source, categories, max_chars):
+        calls.append(max_chars)
+        if len(calls) == 1:
+            # Имитируем ошибку Ollama 400 превышения контекста
+            response = httpx.Response(
+                400,
+                request=httpx.Request("POST", "http://test"),
+                json={"error": {"message": "request exceeds the available context size"}},
+            )
+            raise BadRequestError(
+                message="request exceeds the available context size",
+                response=response,
+                body={"error": {"message": "request exceeds the available context size"}},
+            )
+        # На втором вызове (с усеченным текстом) возвращаем валидный результат
+        return SentimentAnalysisResult(
+            sentiment_score=0.5,
+            sentiment_label="bullish",
+            confidence=0.8,
+            impact_magnitude=5,
+            time_horizon="immediate_1h_4h",
+            information_type="hard_fact",
+            market_surprise="better_than_expected",
+            transmission_channel="liquidity_and_rates",
+            affected_assets=[],
+            key_takeaways=["Test"],
+            target_horizon_hours=4,
+            is_mean_reverting=False,
+            is_speculative=False,
+            speculation_reason="Тестовый факт",
+            detected_currencies=["BTC"],
+            detected_categories=["Macro"],
+            reasoning="Тест повторной попытки",
+        )
+
+    monkeypatch.setattr(analyzer, "_run_analysis", mock_run_analysis)
+
+    result = await analyzer.analyze_article(
+        title="Very long analysis",
+        content="Long article " * 500,
+        source="Test",
+        categories=["Macro"],
+    )
+
+    assert result.sentiment_score == 0.5
+    assert len(calls) == 2
+    assert calls[0] == 4000  # Первый вызов со стандартным лимитом
+    assert calls[1] == 2000  # Повторный вызов с адаптивным усечением до 2000 символов

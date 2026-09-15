@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     batch_size: int = 3
     poll_interval_seconds: int = 10
     error_retry_delay_seconds: int = 5
-    max_content_chars: int = 6000
+    max_content_chars: int = 4000
     max_concurrent_requests: int = 2
     log_level: str = "INFO"
 

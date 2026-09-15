@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from typing import Dict, Any
+from openai import APIConnectionError, RateLimitError
 
 from config import settings
 from db import DatabaseManager
@@ -60,8 +61,15 @@ class SentimentWorker:
         tasks = [self._process_single_article(article) for article in batch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        success = sum(1 for r in results if not isinstance(r, Exception))
+        success = sum(1 for r in results if r is True)
         logger.info("Пачка обработана: успешно %d / %d", success, len(batch))
+
+        # При инфраструктурных ошибках LLM делаем паузу во избежание быстрого спама в цикле
+        infra_errors = [r for r in results if isinstance(r, (APIConnectionError, RateLimitError))]
+        if infra_errors:
+            logger.warning("Обнаружены инфраструктурные ошибки LLM. Пауза %dс перед следующей попыткой...", settings.error_retry_delay_seconds)
+            await asyncio.sleep(settings.error_retry_delay_seconds)
+
         return len(batch)
 
     async def _process_single_article(self, article: Dict[str, Any]):
@@ -94,9 +102,18 @@ class SentimentWorker:
                 )
                 return True
 
+            except (APIConnectionError, RateLimitError) as infra_err:
+                logger.error("❌ Инфраструктурная ошибка LLM при анализе [ID %d] '%s': %s", news_id, title[:40], infra_err)
+                raise infra_err
+
             except Exception as e:
                 logger.error("❌ Ошибка обработки статьи [ID %d] '%s': %s", news_id, title[:40], e)
-                raise e
+                try:
+                    await self.db.save_llm_error(news_id=news_id, error_message=str(e))
+                    logger.warning("Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id)
+                except Exception as db_err:
+                    logger.error("Не удалось сохранить статус ошибки для статьи [ID %d]: %s", news_id, db_err)
+                return False
 
     def stop(self):
         """Плавная остановка воркера."""

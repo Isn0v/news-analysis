@@ -3,7 +3,7 @@
 import logging
 import re
 from typing import Optional
-from openai import AsyncOpenAI, RateLimitError, APIConnectionError
+from openai import AsyncOpenAI, RateLimitError, APIConnectionError, BadRequestError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from config import settings
@@ -44,12 +44,46 @@ class SentimentAnalyzer:
         categories: list[str],
     ) -> SentimentAnalysisResult:
         """Анализирует статью и возвращает строго типизированный SentimentAnalysisResult."""
+        try:
+            return await self._run_analysis(
+                title=title,
+                content=content,
+                source=source,
+                categories=categories,
+                max_chars=settings.max_content_chars,
+            )
+        except BadRequestError as bad_req_err:
+            err_msg = str(bad_req_err).lower()
+            if "context" in err_msg or "exceed" in err_msg or "token" in err_msg:
+                logger.warning(
+                    "Контекст модели превышен для статьи '%s'. "
+                    "Повторный анализ с сокращением текста до 2000 символов...",
+                    title[:50],
+                )
+                return await self._run_analysis(
+                    title=title,
+                    content=content,
+                    source=source,
+                    categories=categories,
+                    max_chars=2000,
+                )
+            raise
+
+    async def _run_analysis(
+        self,
+        title: str,
+        content: str,
+        source: str,
+        categories: list[str],
+        max_chars: int,
+    ) -> SentimentAnalysisResult:
+        """Внутренний метод инференса с попыткой Structured Output и fallback'ом."""
         user_prompt = build_analysis_user_prompt(
             title=title,
             source=source,
             categories=categories,
             content=content,
-            max_chars=settings.max_content_chars,
+            max_chars=max_chars,
         )
 
         logger.debug("Отправка статьи '%s' на анализ в модель %s...", title[:50], self.model)
@@ -75,6 +109,9 @@ class SentimentAnalyzer:
                     parsed_result.reasoning = think_reasoning.strip()
                 return parsed_result
 
+        except BadRequestError as bad_req:
+            # Ошибки превышения контекста пробрасываем выше для адаптивной обрезки
+            raise bad_req
         except Exception as parse_err:
             logger.warning(
                 "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой <think> тегов...",

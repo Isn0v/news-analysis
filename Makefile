@@ -20,6 +20,12 @@ vendor:
 llm-run:
 	cd llm && uv run python main.py
 
+## ollama-setup: настроить увеличенный контекст (16k) для локальной модели DeepSeek в Ollama
+ollama-setup:
+	@printf "FROM deepseek-r1:14b\nPARAMETER num_ctx 16384\n" > /tmp/Modelfile.deepseek && \
+	ollama create deepseek-r1:14b -f /tmp/Modelfile.deepseek && \
+	rm /tmp/Modelfile.deepseek
+
 ## llm-reset: сбросить статус обработки новостей и подготовить к повторному инференсу
 llm-reset:
 	docker compose exec -T db psql -U trader -d crypto_news -c "UPDATE raw_news SET processed = FALSE, processed_at = NULL, llm_result = NULL; TRUNCATE TABLE news_market_impact;"

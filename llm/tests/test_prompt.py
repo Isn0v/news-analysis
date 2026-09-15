@@ -1,10 +1,10 @@
-"""Тесты формирования промптов для LLM."""
+"""Tests for LLM prompt construction and parameterization."""
 
 from prompt import build_analysis_user_prompt
 
 
 def test_build_analysis_user_prompt_formatting():
-    """Проверка подстановки полей в пользовательский промпт."""
+    """Verify field substitution into user prompt template."""
     prompt = build_analysis_user_prompt(
         title="SEC Approves Bitcoin ETF",
         source="CoinDesk",
@@ -12,14 +12,14 @@ def test_build_analysis_user_prompt_formatting():
         content="The Securities and Exchange Commission has approved the first spot Bitcoin ETF.",
     )
 
-    assert "ИСТОЧНИК: CoinDesk" in prompt
-    assert "КАТЕГОРИИ РЕДАКЦИИ: Regulation, Bitcoin" in prompt
-    assert "ЗАГОЛОВОК: SEC Approves Bitcoin ETF" in prompt
+    assert "SOURCE: CoinDesk" in prompt
+    assert "EDITORIAL CATEGORIES: Regulation, Bitcoin" in prompt
+    assert "TITLE: SEC Approves Bitcoin ETF" in prompt
     assert "The Securities and Exchange Commission has approved" in prompt
 
 
 def test_build_analysis_user_prompt_empty_categories():
-    """Проверка подстановки дефолта при отсутствии категорий."""
+    """Verify default placeholder when categories are missing."""
     prompt = build_analysis_user_prompt(
         title="Breaking News",
         source="Twitter",
@@ -27,11 +27,11 @@ def test_build_analysis_user_prompt_empty_categories():
         content="Short text.",
     )
 
-    assert "КАТЕГОРИИ РЕДАКЦИИ: Не указаны" in prompt
+    assert "EDITORIAL CATEGORIES: None specified" in prompt
 
 
 def test_build_analysis_user_prompt_content_truncation():
-    """Проверка обрезки текста статьи по лимиту max_chars."""
+    """Verify article text truncation by max_chars limit."""
     long_content = "A" * 1000
     prompt = build_analysis_user_prompt(
         title="Title",
@@ -41,6 +41,5 @@ def test_build_analysis_user_prompt_content_truncation():
         max_chars=200,
     )
 
-    # Проверяем, что в результирующем промпте нет 1000 символов 'A'
     assert "A" * 200 in prompt
     assert "A" * 201 not in prompt
