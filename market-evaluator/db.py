@@ -100,6 +100,7 @@ class DatabaseManager:
             "is_mean_reverting_expected": metrics.is_mean_reverting_expected,
             "is_impulse_confirmed": metrics.is_impulse_confirmed,
             "is_target_horizon_aligned": metrics.is_target_horizon_aligned,
+            "is_speculative": metrics.is_speculative,
             "is_aligned_15m": metrics.is_aligned_15m,
             "is_aligned_1h": metrics.is_aligned_1h,
             "is_aligned_4h": metrics.is_aligned_4h,

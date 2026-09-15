@@ -24,6 +24,7 @@ class EventStudyEngine:
         impact_magnitude: int,
         target_horizon_hours: int = 4,
         is_mean_reverting: bool = False,
+        is_speculative: bool = False,
     ) -> Optional[EventStudyMetrics]:
         """Вычисляет полный набор метрик доходностей, просадок и точности прогноза."""
         if not candles:
@@ -168,6 +169,7 @@ class EventStudyEngine:
             impact_magnitude=impact_magnitude,
             target_horizon_hours=target_horizon_hours,
             is_mean_reverting_expected=is_mean_reverting,
+            is_speculative=is_speculative,
             is_impulse_confirmed=is_impulse_confirmed,
             is_target_horizon_aligned=is_target_horizon_aligned,
             is_aligned_15m=aligned_15m,

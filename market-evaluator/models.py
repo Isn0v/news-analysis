@@ -43,6 +43,7 @@ class EventStudyMetrics(BaseModel):
     impact_magnitude: int
     target_horizon_hours: int = 4
     is_mean_reverting_expected: bool = False
+    is_speculative: bool = False
 
     # Согласованность с прогнозом
     is_impulse_confirmed: Optional[bool] = None

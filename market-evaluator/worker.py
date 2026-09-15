@@ -46,16 +46,9 @@ class MarketEvaluationWorker:
         if t0_timestamp.tzinfo is None:
             t0_timestamp = t0_timestamp.replace(tzinfo=timezone.utc)
 
-        # 1. Фильтр спекулятивности: пропускаем мнения, гадания и кликбейт
+        # Классификация спекулятивности
         is_speculative = bool(llm_result.get("is_speculative", False))
-        spec_reason = llm_result.get("speculation_reason", "Спекулятивный шум / частное мнение")
-        if is_speculative:
-            logger.info(
-                "⏩ [ID %d | ПРОПУСК] Спекулятивная новость ('%s'). Дальнейший рыночный анализ пропущен.",
-                news_id,
-                spec_reason,
-            )
-            return []
+        spec_reason = llm_result.get("speculation_reason", "")
 
         affected_assets = llm_result.get("affected_assets") or []
         # Fallback: если affected_assets пуст, пробуем извлечь из detected_currencies
@@ -117,15 +110,18 @@ class MarketEvaluationWorker:
                 impact_magnitude=impact_magnitude,
                 target_horizon_hours=target_horizon_hours,
                 is_mean_reverting=is_mean_reverting,
+                is_speculative=is_speculative,
             )
 
             if metrics:
                 await self.db.save_market_impact(news_id=news_id, metrics=metrics)
                 results.append(metrics)
+                type_tag = "🚨 СПЕКУЛЯЦИЯ" if metrics.is_speculative else "🛡 ФАКТ"
                 logger.info(
-                    "📊 [ID %d | %s] P0: $%s | VolSurge: x%0.2f | Импульс: %s | Горизонт %dч: %s",
+                    "📊 [ID %d | %s | %s] P0: $%s | VolSurge: x%0.2f | Импульс: %s | Горизонт %dч: %s",
                     news_id,
                     symbol,
+                    type_tag,
                     metrics.p0_price,
                     metrics.volume_surge_ratio,
                     "✅" if metrics.is_impulse_confirmed else "❌",
