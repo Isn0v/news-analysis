@@ -17,3 +17,5 @@ go-collector/vendor
 **/.venv
 
 **/articles
+# Export dumps
+**/exports/

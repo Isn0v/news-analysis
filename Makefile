@@ -43,6 +43,14 @@ eval-batch:
 eval-stats:
 	cd market-evaluator && uv run python main.py --stats
 
+## db-export: экспортировать все данные из БД в CSV и JSON (./market-evaluator/exports/)
+db-export:
+	cd market-evaluator && uv run python export.py --output-dir ./exports
+
+## db-export-combined: экспортировать только итоговую объединённую таблицу (статья + LLM + рынок)
+db-export-combined:
+	cd market-evaluator && uv run python export.py --only combined --output-dir ./exports
+
 ## test-collector: запустить тесты go-collector (с цветным выводом)
 test-collector:
 	@cd go-collector && if command -v gotestsum >/dev/null 2>&1; then \
