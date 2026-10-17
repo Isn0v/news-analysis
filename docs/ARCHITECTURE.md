@@ -1,0 +1,166 @@
+# 🏗 Архитектура системы News Analysis & Crypto Sentiment Engine
+
+Высокопроизводительный микросервисный комплекс для автоматизированного сбора, дедупликации, квантитативного финансового NLP-анализа и рыночной валидации криптовалютных новостей в реальном времени.
+
+---
+
+## 🗺 Схема взаимодействия сервисов
+
+```mermaid
+flowchart TD
+    subgraph Sources["16 RSS/Atom Источников (Tier 1–4)"]
+        S1["Расследования (Protos, Unchained, SmartLiquidity)"]
+        S2["Крупные СМИ (CoinDesk, BeInCrypto, CryptoSlate...)"]
+        S3["Новости и теханализ (NewsBTC, ZyCrypto...)"]
+        S4["Авторские эссе (Arthur Hayes, Cobie)"]
+    end
+
+    subgraph ServiceCollector["go-collector (Go 1.24)"]
+        FanIn["Параллельный опрос горутинами (Fan-In)"]
+        Clean["Очистка UTM, дедупликация URL, WAF Bypass"]
+        Repo["database.Repository"]
+    end
+
+    subgraph Database["PostgreSQL 15"]
+        RawNews[("Таблица raw_news<br/>WHERE processed=FALSE<br/>ORDER BY timestamp_utc ASC")]
+        ImpactTable[("Таблица news_market_impact<br/>(Event Study Metrics)")]
+    end
+
+    subgraph ServiceLLM["llm (Python 3.12 + uv)"]
+        WorkerLLM["SentimentWorker (Async Queue Daemon)"]
+        Analyzer["SentimentAnalyzer (OpenAI Structured Outputs + Think-parser)"]
+        LLMInference["LLM (Ollama / DeepSeek-R1:14b / API)"]
+    end
+
+    subgraph ServiceMarket["market-evaluator (Python 3.12 + uv)"]
+        WorkerMarket["MarketEvaluationWorker"]
+        Engine["EventStudyEngine"]
+        BinanceAPI["Binance Public REST API (KLINES)"]
+    end
+
+    Sources --> FanIn --> Clean --> Repo -->|INSERT ON CONFLICT DO NOTHING| RawNews
+    RawNews <-->|"FIFO пачки по BATCH_SIZE"| WorkerLLM
+    WorkerLLM <--> Analyzer <--> LLMInference
+    WorkerLLM -->|"UPDATE raw_news SET llm_result, processed=TRUE"| RawNews
+    RawNews <-->|"Выборка processed=TRUE AND market_evaluated=FALSE"| WorkerMarket
+    WorkerMarket <--> BinanceAPI
+    WorkerMarket <--> Engine
+    Engine -->|"INSERT news_market_impact & SET market_evaluated=TRUE"| ImpactTable
+```
+
+---
+
+## 🔄 Жизненный цикл новости ($t_0 \to \text{DB} \to \text{LLM} \to \text{Market}$)
+
+1. **Фаза сбора (`go-collector`):**
+   * Раз в `COLLECTOR_POLL_INTERVAL_SECONDS` (по умолчанию 5 мин) запускается конкурентный сбор со всех активных RSS-лент.
+   * Очищаются UTM-метки, извлекается полный контент (`content:encoded`).
+   * Новость сохраняется в PostgreSQL в таблицу `raw_news` со статусом `processed = FALSE`. При совпадении URL запись пропускается (`ON CONFLICT (url) DO NOTHING`).
+
+2. **Фаза квантитативного анализа сентимента (`llm`):**
+   * Демон `SentimentWorker` забирает пачку самых старых необработанных статей (`processed = FALSE`) в хронологическом порядке (`ORDER BY timestamp_utc ASC`).
+   * Через `asyncio.Semaphore` статьи отправляются на инференс в LLM.
+   * Полученный 11-мерный структурированный объект `SentimentAnalysisResult` сохраняется в поле `llm_result JSONB`, а флаг `processed` переводится в `TRUE`.
+
+3. **Фаза рыночной валидации (`market-evaluator`):**
+   * Воркер `MarketEvaluationWorker` выбирает новости, где `processed = TRUE AND market_evaluated = FALSE`.
+   * Извлекаются затронутые тикеры (`affected_assets` и `detected_currencies`), которые сопоставляются со спотовыми парами Binance (например, `BTC` $\to$ `BTCUSDT`).
+   * С публичного API Binance выгружаются 15-минутные свечи вокруг времени публикации $t_0$ (от $t_0 - 4\text{ч}$ до $t_0 + 24\text{ч}$).
+   * Математический движок `EventStudyEngine` рассчитывает пре-новостной дрифт (Pre-event Drift), всплеск объема (Volume Surge Ratio), сетку доходностей (+15м, +1ч, +4ч, +24ч), экстремумы и сверяет точность прогноза (Directional Alignment).
+   * Результаты сохраняются в таблицу `news_market_impact`, а новость помечается флагом `market_evaluated = TRUE`.
+
+4. **Фаза экспорта и аналитики (`export.py`):**
+   * Команда `make db-export` выгружает сырые новости, разметку LLM и рыночные метрики в плоские CSV и JSON файлы для последующего эконометрического анализа.
+
+---
+
+## 💾 Схема базы данных PostgreSQL
+
+### Таблица `raw_news`
+```sql
+CREATE TABLE IF NOT EXISTS raw_news (
+    id                  SERIAL PRIMARY KEY,
+    guid                TEXT,
+    url                 TEXT NOT NULL UNIQUE,
+    timestamp_utc       TIMESTAMP NOT NULL,
+    updated_at_utc      TIMESTAMP,
+    source              VARCHAR(100) NOT NULL,
+    origin_source       TEXT,
+    origin_url          TEXT,
+    authors             TEXT[],
+    title               TEXT NOT NULL,
+    image_url           TEXT,
+    categories          TEXT[],
+    description         TEXT,
+    content             TEXT NOT NULL,
+    processed           BOOLEAN DEFAULT FALSE,
+    processed_at        TIMESTAMP,
+    llm_result          JSONB,
+    market_evaluated    BOOLEAN DEFAULT FALSE,
+    market_evaluated_at TIMESTAMP,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_raw_news_unprocessed
+    ON raw_news (timestamp_utc DESC) WHERE processed = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_news_market_unevaluated
+    ON raw_news (timestamp_utc DESC) WHERE processed = TRUE AND market_evaluated = FALSE;
+```
+
+### Таблица `news_market_impact`
+```sql
+CREATE TABLE IF NOT EXISTS news_market_impact (
+    id                          BIGSERIAL PRIMARY KEY,
+    news_id                     BIGINT NOT NULL REFERENCES raw_news(id) ON DELETE CASCADE,
+    ticker                      VARCHAR(20) NOT NULL,
+    symbol                      VARCHAR(20) NOT NULL,
+    t0_timestamp                TIMESTAMPTZ NOT NULL,
+    p0_price                    NUMERIC NOT NULL,
+    pre_drift_pct               NUMERIC,
+    volume_surge_ratio          NUMERIC,
+    return_15m_pct              NUMERIC,
+    return_1h_pct               NUMERIC,
+    return_2h_pct               NUMERIC,
+    return_4h_pct               NUMERIC,
+    return_8h_pct               NUMERIC,
+    return_24h_pct              NUMERIC,
+    max_runup_pct               NUMERIC,
+    max_drawdown_pct            NUMERIC,
+    volatility_range_pct        NUMERIC,
+    sentiment_label             VARCHAR(20),
+    sentiment_score             NUMERIC,
+    impact_magnitude            INT,
+    target_horizon_hours        INT,
+    is_mean_reverting_expected  BOOLEAN,
+    is_impulse_confirmed        BOOLEAN,
+    is_target_horizon_aligned   BOOLEAN,
+    is_speculative              BOOLEAN DEFAULT FALSE,
+    is_aligned_15m              BOOLEAN,
+    is_aligned_1h               BOOLEAN,
+    is_aligned_4h               BOOLEAN,
+    is_aligned_24h              BOOLEAN,
+    metrics_detail              JSONB,
+    evaluated_at                TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT uq_news_ticker UNIQUE (news_id, ticker)
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_impact_news_id ON news_market_impact(news_id);
+CREATE INDEX IF NOT EXISTS idx_market_impact_ticker ON news_market_impact(ticker);
+CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timestamp DESC);
+```
+
+---
+
+## 🖥 Инфраструктурные особенности инференса
+
+* **macOS (Apple Silicon M-series):** В силу ограничений виртуализации Docker на macOS графический стек Apple Metal не пробрасывается в контейнеры. Ollama запускается **нативно на хосте**, а контейнеры Docker обращаются к ней через сетевой шлюз `host.docker.internal:11434`.
+* **Linux (NVIDIA GPU):** Контейнер с Ollama или vLLM может быть развернут прямо в общем `docker-compose.yaml` с секцией `deploy.resources.reservations.devices`.
+
+---
+
+## 📑 Ссылки на документацию микросервисов
+
+* [Документация `go-collector`](file:///Users/isnov/Documents/Git/news-analysis/go-collector/README.md)
+* [Документация `llm`](file:///Users/isnov/Documents/Git/news-analysis/llm/README.md)
+* [Документация `market-evaluator`](file:///Users/isnov/Documents/Git/news-analysis/market-evaluator/README.md)

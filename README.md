@@ -41,7 +41,7 @@ flowchart TD
     Worker <--> Parser <--> Ollama & CloudAPI
 ```
 
-1. **`go-collector` (Go 1.24):**
+1. **[`go-collector`](file:///Users/isnov/Documents/Git/news-analysis/go-collector/README.md) (Go 1.24):**
    * Конкурентный сборщик на горутинах (паттерн Fan-In).
    * Опрос 16 очищенных авторитетных источников с извлечением полного текста (`content:encoded`).
    * Нормализация URL (удаление UTM-меток, трекеров) и дедупликация на уровне БД (`ON CONFLICT (url) DO NOTHING`).
@@ -52,17 +52,19 @@ flowchart TD
    * Партиционированный индекс `idx_raw_news_unprocessed` по `(timestamp_utc DESC) WHERE processed = FALSE` для мгновенной выборки новых статей воркером.
    * Поле `llm_result JSONB` для гибкого хранения структурированного отчета.
 
-3. **`llm` (Python 3.12 + uv):**
+3. **[`llm`](file:///Users/isnov/Documents/Git/news-analysis/llm/README.md) (Python 3.12 + uv):**
    * Асинхронный воркер (`SentimentWorker`) с семафорным контролем параллелизма.
    * Гарантированная Pydantic-валидация через OpenAI-совместимый протокол Structured Outputs.
    * Поддержка цепочек рассуждений моделей DeepSeek-R1 (автоматическое извлечение и изоляция блоков `<think>...</think>`).
    * Внешние `.sql` файлы для работы с БД через пул соединений `psycopg3`.
 
-4. **`market-evaluator` (Python 3.12 + uv):**
+4. **[`market-evaluator`](file:///Users/isnov/Documents/Git/news-analysis/market-evaluator/README.md) (Python 3.12 + uv):**
    * Микросервис квантитативного анализа рыночной реакции котировок (Event Study Engine).
    * Автоматическая выгрузка OHLCV-свечей с публичного API Binance вокруг времени публикации статьи ($t_0 - 4\text{ч} \dots t_0 + 24\text{ч}$).
    * Расчет доходностей (+15м, +1ч, +4ч, +24ч), пре-новостных утечек (Pre-event Drift), всплесков объемов и просадок.
    * Автоматическая валидация прогнозов LLM (Win Rate / Directional Alignment) с записью в таблицу `news_market_impact`.
+
+> 📖 Подробное описание сквозного пайплайна и схемы БД см. в [**`docs/ARCHITECTURE.md`**](file:///Users/isnov/Documents/Git/news-analysis/docs/ARCHITECTURE.md).
 
 ---
 
