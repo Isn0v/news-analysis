@@ -40,7 +40,9 @@ class SentimentAnalyzer:
         )
         self.model = settings.llm_model
         self.temperature = settings.llm_temperature
-        self.extra_body = {"options": {"num_ctx": settings.llm_num_ctx}}
+        # Параметры options (num_ctx) передаем только для локальной Ollama
+        is_ollama = "11434" in str(settings.llm_base_url) or "ollama" in str(settings.llm_base_url).lower()
+        self.extra_body = {"options": {"num_ctx": settings.llm_num_ctx}} if is_ollama else None
 
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
@@ -102,16 +104,19 @@ class SentimentAnalyzer:
 
         # 1. Попытка через стандартный Structured Outputs метод .parse()
         try:
-            response = await self.client.beta.chat.completions.parse(
-                model=self.model,
-                messages=[
+            parse_kwargs = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format=SentimentAnalysisResult,
-                temperature=self.temperature,
-                extra_body=self.extra_body,
-            )
+                "response_format": SentimentAnalysisResult,
+                "temperature": self.temperature,
+            }
+            if self.extra_body:
+                parse_kwargs["extra_body"] = self.extra_body
+
+            response = await self.client.beta.chat.completions.parse(**parse_kwargs)
 
             parsed_result = response.choices[0].message.parsed
             if parsed_result is not None:
@@ -121,22 +126,26 @@ class SentimentAnalyzer:
                     parsed_result.reasoning = think_reasoning.strip()
                 return parsed_result
 
-        except (LengthFinishReasonError, ValidationError) as parse_err:
+        except (LengthFinishReasonError, ValidationError, BadRequestError) as parse_err:
             logger.warning(
-                "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой <think> тегов...",
+                "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой и JSON-парсингом...",
                 parse_err,
             )
 
         # 2. Fallback для моделей, выводящих нестандартный JSON или <think> теги
-        raw_response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
+        fallback_kwargs = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT + FALLBACK_JSON_INSTRUCTION},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=self.temperature,
-            extra_body=self.extra_body,
-        )
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+        }
+        if self.extra_body:
+            fallback_kwargs["extra_body"] = self.extra_body
+
+        raw_response = await self.client.chat.completions.create(**fallback_kwargs)
 
         content_text = raw_response.choices[0].message.content or ""
         clean_json = self._extract_json_from_text(content_text)

@@ -2,12 +2,13 @@
 
 import asyncio
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from openai import APIConnectionError, RateLimitError
 
+from analyzer import SentimentAnalyzer
 from config import settings
 from db import DatabaseManager
-from analyzer import SentimentAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class SentimentWorker:
 
         return len(batch)
 
-    async def _process_single_article(self, article: Dict[str, Any]):
+    async def _process_single_article(self, article: dict[str, Any]):
         """Обрабатывает одну статью с ограничением конкурентности через Semaphore."""
         async with self.semaphore:
             news_id = article["id"]

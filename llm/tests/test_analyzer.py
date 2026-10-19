@@ -146,5 +146,6 @@ async def test_analyze_article_context_overflow_retry(monkeypatch):
 
     assert result.sentiment_score == 0.5
     assert len(calls) == 2
-    assert calls[0] == 4000  # Первый вызов со стандартным лимитом
+    from config import settings
+    assert calls[0] == settings.max_content_chars  # Первый вызов со стандартным лимитом
     assert calls[1] == 2000  # Повторный вызов с адаптивным усечением до 2000 символов

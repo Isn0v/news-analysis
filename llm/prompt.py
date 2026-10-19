@@ -60,10 +60,29 @@ SCORING & VALUATION FRAMEWORK:
    - ALL OUTPUT VALUES (including 'reasoning', 'key_takeaways', 'speculation_reason', and asset rationales) MUST BE WRITTEN IN ENGLISH.
 """
 
-FALLBACK_JSON_INSTRUCTION = (
-    "\nIMPORTANT: Output your response strictly as valid JSON matching the specified schema. "
-    "Do not include any conversational preamble or markdown codeblock wrappers."
-)
+FALLBACK_JSON_INSTRUCTION = """
+IMPORTANT: Output your response strictly as a single valid JSON object containing ALL of the following fields:
+{
+  "sentiment_score": 0.0,
+  "sentiment_label": "bullish" | "bearish" | "neutral",
+  "confidence": 0.85,
+  "impact_magnitude": 5,
+  "time_horizon": "immediate_1h_4h" | "short_term_1d_3d" | "medium_term_1w_1m" | "long_term_months",
+  "information_type": "hard_fact" | "rumor_leak" | "opinion_analysis" | "macro_release",
+  "market_surprise": "better_than_expected" | "worse_than_expected" | "in_line" | "not_applicable",
+  "transmission_channel": "liquidity_and_rates" | "fiat_debasement" | "geopolitical_risk" | "regulatory" | "defi_tech_exploit" | "general_crypto" | "none",
+  "affected_assets": [{"ticker": "BTC", "sentiment": 0.5, "reason": "Rationale in English"}],
+  "key_takeaways": ["Takeaway 1 in English", "Takeaway 2 in English"],
+  "target_horizon_hours": 4,
+  "is_mean_reverting": false,
+  "is_speculative": false,
+  "speculation_reason": "One concise sentence in English",
+  "detected_currencies": ["BTC"],
+  "detected_categories": ["Macro"],
+  "reasoning": "Detailed economic rationale in English"
+}
+Every field is strictly required. Do not omit any keys. Output only valid raw JSON without preamble.
+"""
 
 
 def build_analysis_user_prompt(
