@@ -63,11 +63,11 @@ test-collector:
 
 ## test-llm: запустить тесты llm сервиса
 test-llm:
-	cd llm && uv run pytest -v
+	cd llm && uv run python -m pytest -v
 
 ## test-eval: запустить тесты market-evaluator
 test-eval:
-	cd market-evaluator && uv run pytest -v
+	cd market-evaluator && uv run python -m pytest -v
 
 ## test: запустить тесты по всем микросервисам
 test: test-collector test-llm test-eval
