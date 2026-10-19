@@ -26,7 +26,7 @@ services:
       - .env
     environment:
       POSTGRES_HOST: db
-      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-${LLM_BASE_URL:-http://host.docker.internal:11434/v1}}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
