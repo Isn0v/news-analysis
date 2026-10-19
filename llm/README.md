@@ -9,7 +9,8 @@
 1. **Многомерная разметка сентимента:** формирование 11-мерного профиля влияния события на баланс спроса и предложения вместо примитивной 3-классовой классификации.
 2. **Идентификация целевого горизонта:** определение времени реализации максимального ценового импакта (`target_horizon_hours`) и признака затухания/отката (`is_mean_reverting`).
 3. **Фильтрация спекулятивного шума:** классификация новости на факт/катализатор или спекулятивный шум (`is_speculative` + `speculation_reason`).
-4. **Отказоустойчивый инференс:** двухконтурная обработка ответов моделей (включая модели с рассуждениями DeepSeek-R1) с автоматической очисткой тегов `<think>` и адаптивной обрезкой контекста.
+4. **Гибридный инференс (Local + Cloud):** бесшовная работа как с локальной Ollama (DeepSeek-R1, Qwen2.5), так и с высокоскоростными облачными провайдерами (Groq Cloud с LPU-ускорением, Gemini, OpenAI) с автоматическим распознаванием токенов.
+5. **Отказоустойчивый инференс:** двухконтурная обработка ответов моделей (включая модели с рассуждениями DeepSeek-R1) с автоматической очисткой тегов `<think>`, адаптивной обрезкой контекста и fallback-инжекцией JSON-схемы.
 
 ---
 
@@ -26,11 +27,11 @@ llm/
 │   ├── test_db_integration.py       # Интеграционные тесты работы с PostgreSQL
 │   ├── test_prompt.py               # Тесты сборки промпта аналитика
 │   └── test_schema.py               # Тесты валидации схемы Pydantic
-├── analyzer.py                      # LLM-клиент с обработкой <think> тегов и fallback
-├── config.py                        # Pydantic Settings конфигурация сервиса
+├── analyzer.py                      # LLM-клиент с обработкой <think> тегов, JSON fallback и Groq/OpenAI API
+├── config.py                        # Pydantic Settings конфигурация сервиса (приоритет .env)
 ├── db.py                            # Асинхронный пул соединений PostgreSQL (psycopg3)
-├── main.py                          # Точка входа с обработкой сигналов завершения
-├── prompt.py                        # Системный промпт финансового аналитика и шаблонизатор
+├── main.py                          # Точка входа с CLI-параметрами (--test-id, --token, --model)
+├── prompt.py                        # Системный промпт финансового аналитика и fallback JSON-схема
 ├── queries.py                       # Загрузчик внешних .sql файлов
 ├── schema.py                        # Pydantic-модели и Enum'ы сентимента
 ├── worker.py                        # Демон пакетной обработки с asyncio.Semaphore
@@ -76,12 +77,15 @@ llm/
 
 ### 2. Двухконтурный инференс ([`analyzer.py`](file:///Users/isnov/Documents/Git/news-analysis/llm/analyzer.py))
 * **Контур 1 (Structured Outputs API):** вызов `client.beta.chat.completions.parse()` со строгой схемой `response_format=SentimentAnalysisResult`. Мыслительный процесс `message.reasoning` переносится в поле `reasoning`.
-* **Контур 2 (Regex Fallback):** для моделей вроде DeepSeek-R1 удаляются теги `<think>.*?</think>`, после чего валидный JSON извлекается регулярным выражением и парсится через `SentimentAnalysisResult.model_validate_json()`.
+* **Контур 2 (JSON Object & Regex Fallback):** если эндпоинт не поддерживает strict json_schema (например, Groq или ряд открытых моделей), сервис автоматически переключается на `response_format={"type": "json_object"}`. В системный промпт инжектируется полный шаблон всех 11 полей (`FALLBACK_JSON_INSTRUCTION`).
+* **Очистка тегов `<think>`:** для моделей с открытым рассуждением (DeepSeek-R1) теги `<think>.*?</think>` удаляются, а валидный JSON извлекается регулярным выражением и валидируется через `SentimentAnalysisResult.model_validate_json()`.
 * **Адаптивный контекст:** при ошибке превышения контекста токенов (`BadRequestError`) текст статьи автоматически усекается до 2000 символов для повторной попытки.
 
 ---
 
 ## ⚙️ Конфигурация ([`config.py`](file:///Users/isnov/Documents/Git/news-analysis/llm/config.py))
+
+Конфигурация сервиса управляется через Pydantic Settings с поддержкой каскадной загрузки: `("../.env", ".env")`. Настройки из корневого файла `.env` проекта являются единым источником правды для Docker Compose, а локальный `llm/.env` позволяет локально переопределять параметры.
 
 | Переменная | По умолчанию | Описание |
 | :--- | :--- | :--- |
@@ -91,21 +95,24 @@ llm/
 | `POSTGRES_PASSWORD` | *(Обязательно)* | Пароль БД |
 | `POSTGRES_DB` | `crypto_news` | Имя базы данных |
 | `LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | URL OpenAI-совместимого эндпоинта инференса |
-| `LLM_API_KEY` | `ollama` | API-ключ |
-| `LLM_MODEL` | `deepseek-r1:14b` | Название модели инференса |
+| `LLM_API_KEY` | `ollama` | API-ключ инференса |
+| `GROQ_API_KEY` | `None` | Ключ Groq Cloud (`gsk_...`). При указании автоматически перенаправляет запросы на `https://api.groq.com/openai/v1` |
+| `LLM_MODEL` | `deepseek-r1:14b` | Название модели (напр. `deepseek-r1:14b`, `qwen/qwen3.8-27b`, `gpt-4o-mini`) |
 | `LLM_TEMPERATURE` | `0.1` | Температура генерации |
-| `LLM_NUM_CTX` | `16384` | Размер контекстного окна токенов |
+| `LLM_NUM_CTX` | `16384` | Размер контекстного окна токенов (только для Ollama) |
 | `LLM_TIMEOUT` | `120.0` | Таймаут HTTP-запроса (секунды) |
 | `BATCH_SIZE` | `3` | Количество новостей за одну выборку |
 | `MAX_CONCURRENT_REQUESTS`| `2` | Число одновременных запросов к LLM (Semaphore) |
 | `MAX_CONTENT_CHARS` | `4000` | Максимальная длина статьи в промпте |
 | `POLL_INTERVAL_SECONDS` | `10` | Пауза при пустой очереди |
 
+> 💡 **Автоопределение Groq Cloud:** Если `GROQ_API_KEY` задан или `LLM_API_KEY` начинается с префикса `gsk_`, сервис автоматически подставит `LLM_BASE_URL=https://api.groq.com/openai/v1` и модель `qwen/qwen3.8-27b` (если модель не была задана явно), гарантируя ультрабыстрый инференс (~2.5 сек на статью) без нагрузки на локальный GPU.
+
 ---
 
-## 🚀 Запуск и тестирование
+## 🚀 Запуск и CLI-интерфейс ([`main.py`](file:///Users/isnov/Documents/Git/news-analysis/llm/main.py))
 
-### Локальный запуск через `uv`
+### 1. Локальный запуск демона через `uv`
 ```bash
 cd llm
 uv sync
@@ -117,9 +124,32 @@ uv run python main.py
 make llm-run
 ```
 
-### Запуск тестов
+### 2. Тестирование одиночной новости по ID (`--test-id`)
+Позволяет быстро протестировать промпт и ответ модели на конкретной статье из БД без непрерывного опроса очереди:
 ```bash
+# Тест с локальной Ollama:
+uv run python main.py --test-id 18643
+
+# Тест с облачным токеном Groq и выбранной моделью:
+uv run python main.py --test-id 18643 --token gsk_your_key_here --model qwen/qwen3.8-27b
+```
+
+### 3. Переопределение параметров инференса через флаги CLI
+```bash
+uv run python main.py --token gsk_xxx --model qwen/qwen3.8-27b --base-url https://api.groq.com/openai/v1
+```
+
+---
+
+## 🧪 Запуск тестов
+
+Тестовый набор покрывает Pydantic-схему, удаление тегов `<think>`, fallback парсинг поврежденного JSON, шаблонизацию промпта и интеграцию с базой данных:
+
+```bash
+# Из корня репозитория:
 make test-llm
-# или
-cd llm && uv run pytest -v
+
+# Или напрямую в папке сервиса:
+cd llm
+uv run python -m pytest -v
 ```

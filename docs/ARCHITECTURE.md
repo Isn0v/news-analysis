@@ -28,8 +28,8 @@ flowchart TD
 
     subgraph ServiceLLM["llm (Python 3.12 + uv)"]
         WorkerLLM["SentimentWorker (Async Queue Daemon)"]
-        Analyzer["SentimentAnalyzer (OpenAI Structured Outputs + Think-parser)"]
-        LLMInference["LLM (Ollama / DeepSeek-R1:14b / API)"]
+        Analyzer["SentimentAnalyzer (Structured Outputs + Think-parser + JSON Fallback)"]
+        LLMInference["Инференс LLM (Локальная Ollama / Groq LPU Cloud / OpenAI / Gemini)"]
     end
 
     subgraph ServiceMarket["market-evaluator (Python 3.12 + uv)"]
@@ -59,7 +59,8 @@ flowchart TD
 
 2. **Фаза квантитативного анализа сентимента (`llm`):**
    * Демон `SentimentWorker` забирает пачку самых старых необработанных статей (`processed = FALSE`) в хронологическом порядке (`ORDER BY timestamp_utc ASC`).
-   * Через `asyncio.Semaphore` статьи отправляются на инференс в LLM.
+   * Через `asyncio.Semaphore` статьи отправляются на инференс в LLM (локальный через Ollama или высокоскоростной через Groq LPU Cloud).
+   * При работе с моделями без нативной поддержки `response_format=json_schema` сервис прозрачно переключается в режим `json_object` с автоматической инжекцией полного контракта полей (`FALLBACK_JSON_INSTRUCTION`).
    * Полученный 11-мерный структурированный объект `SentimentAnalysisResult` сохраняется в поле `llm_result JSONB`, а флаг `processed` переводится в `TRUE`.
 
 3. **Фаза рыночной валидации (`market-evaluator`):**
@@ -154,8 +155,28 @@ CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timesta
 
 ## 🖥 Инфраструктурные особенности инференса
 
+### 1. Архитектура Single Source of Truth (SSOT)
+Конфигурация проекта централизована в корневом файле `.env`:
+* **Docker Compose:** считывает переменные только из корня проекта. Сервисы получают единые настройки подключения к БД и инференсу.
+* **Каскад Pydantic Settings:** Python-сервисы считывают конфигурацию в порядке `("../.env", ".env")`, гарантируя идентичность окружения при запуске как внутри контейнера, так и локально на хосте.
+
+### 2. Провайдеры инференса:
 * **macOS (Apple Silicon M-series):** В силу ограничений виртуализации Docker на macOS графический стек Apple Metal не пробрасывается в контейнеры. Ollama запускается **нативно на хосте**, а контейнеры Docker обращаются к ней через сетевой шлюз `host.docker.internal:11434`.
+* **Groq LPU Cloud (Ультрабыстрый инференс):** При наличии ключа `GROQ_API_KEY` (или токена с префиксом `gsk_`) сервис автоматически перенаправляет запросы в облако Groq на модель `qwen/qwen3.8-27b`, обеспечивая скорость ~2.5 секунды на статью без утилизации ресурсов хоста.
 * **Linux (NVIDIA GPU):** Контейнер с Ollama или vLLM может быть развернут прямо в общем `docker-compose.yaml` с секцией `deploy.resources.reservations.devices`.
+
+---
+
+## 🗺 Стратегический вектор развития: Переход на рынок РФ (MOEX)
+
+Текущий криптовалютный пайплайн (Binance + RSS) служит верифицированным полигоном для квантитативной валидации гипотез. В рамках стратегии развития архитектура эволюционирует в сторону российского фондового рынка:
+
+1. **Этап 1 (Мульти-LLM маршрутизация):** Пул бесплатных облачных провайдеров (Groq, Gemini Flash, локальный DeepSeek-R1) с автоматическим переключением при лимитах TPM/RPM.
+2. **Этап 2 (Источники рынка РФ):** Парсинг корпоративных раскрытий сущфактов ([e-disclosure.ru](https://e-disclosure.ru)), лент Интерфакс/Финмаркет и Moex ISS API (акции Мосбиржи).
+3. **Этап 3 (Telegram MTProto Listener):** Высокоскоростной сбор инсайдов и памп-сигналов из российских каналов с задержкой < 200 мс.
+4. **Этап 4 (Алготрейдинг):** Интеграция с Tinkoff Invest API (T-Bank) для автоматического исполнения сделок на акциях IMOEX с контролем волатильности и лимитов.
+
+> 📖 Полный план архитектурных работ, задач и метрик см. в [**`ROADMAP.md`**](file:///Users/isnov/Documents/Git/news-analysis/ROADMAP.md).
 
 ---
 
@@ -164,3 +185,4 @@ CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timesta
 * [Документация `go-collector`](file:///Users/isnov/Documents/Git/news-analysis/go-collector/README.md)
 * [Документация `llm`](file:///Users/isnov/Documents/Git/news-analysis/llm/README.md)
 * [Документация `market-evaluator`](file:///Users/isnov/Documents/Git/news-analysis/market-evaluator/README.md)
+* [Дорожная карта `ROADMAP.md`](file:///Users/isnov/Documents/Git/news-analysis/ROADMAP.md)

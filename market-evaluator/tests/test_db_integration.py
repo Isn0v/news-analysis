@@ -4,20 +4,28 @@
 Если PostgreSQL недоступен, тесты аккуратно пропускаются.
 """
 
+import asyncio
 import pytest
 from config import settings
 from db import DatabaseManager
 
 
+async def _get_connected_db():
+    db = DatabaseManager()
+    try:
+        async with asyncio.timeout(2.0):
+            await db.initialize()
+        return db
+    except Exception as e:
+        if db.pool:
+            await db.close()
+        pytest.skip(f"PostgreSQL недоступен для интеграционного теста: {e}")
+
+
 @pytest.mark.asyncio
 async def test_database_connection_and_stats():
     """Проверка подключения к PostgreSQL и выполнения аналитического SQL-запроса."""
-    db = DatabaseManager()
-    try:
-        await db.initialize()
-    except Exception as e:
-        pytest.skip(f"PostgreSQL недоступен для интеграционного теста: {e}")
-
+    db = await _get_connected_db()
     try:
         # Проверяем исполнение сложного SQL-запроса get_stats
         stats = await db.get_stats()
@@ -34,12 +42,7 @@ async def test_database_connection_and_stats():
 @pytest.mark.asyncio
 async def test_fetch_unevaluated_news_query():
     """Проверка корректности синтаксиса и выполнения FETCH_UNEVALUATED_NEWS_QUERY."""
-    db = DatabaseManager()
-    try:
-        await db.initialize()
-    except Exception as e:
-        pytest.skip(f"PostgreSQL недоступен для интеграционного теста: {e}")
-
+    db = await _get_connected_db()
     try:
         news_list = await db.fetch_unevaluated_news(limit=5)
         assert isinstance(news_list, list)

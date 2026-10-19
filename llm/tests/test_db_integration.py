@@ -1,18 +1,27 @@
-"""Интеграционные тесты работы с базой данных PostgreSQL для сервиса LLM."""
-
+import asyncio
 import pytest
 from db import DatabaseManager
+
+
+async def _get_connected_db():
+    db = DatabaseManager()
+    try:
+        await db.initialize()
+        async with asyncio.timeout(2.0):
+            async with db.pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT 1;")
+        return db
+    except Exception as e:
+        if db.pool:
+            await db.close()
+        pytest.skip(f"PostgreSQL недоступен для теста: {e}")
 
 
 @pytest.mark.asyncio
 async def test_llm_db_connection_and_stats():
     """Проверка подключения к PostgreSQL и выполнения статистики по raw_news."""
-    db = DatabaseManager()
-    try:
-        await db.initialize()
-    except Exception as e:
-        pytest.skip(f"PostgreSQL недоступен для теста: {e}")
-
+    db = await _get_connected_db()
     try:
         stats = await db.get_stats()
         assert isinstance(stats, dict)
@@ -26,12 +35,7 @@ async def test_llm_db_connection_and_stats():
 @pytest.mark.asyncio
 async def test_fetch_unprocessed_batch_query():
     """Проверка запроса выборки пачки новостей."""
-    db = DatabaseManager()
-    try:
-        await db.initialize()
-    except Exception as e:
-        pytest.skip(f"PostgreSQL недоступен для теста: {e}")
-
+    db = await _get_connected_db()
     try:
         batch = await db.fetch_unprocessed_batch(limit=2)
         assert isinstance(batch, list)
@@ -47,11 +51,7 @@ async def test_fetch_unprocessed_batch_query():
 @pytest.mark.asyncio
 async def test_save_llm_error():
     """Проверка сохранения информации об ошибке анализа без сбоя пайплайна."""
-    db = DatabaseManager()
-    try:
-        await db.initialize()
-    except Exception as e:
-        pytest.skip(f"PostgreSQL недоступен для теста: {e}")
+    db = await _get_connected_db()
 
     try:
         # Вставляем временную тестовую новость
