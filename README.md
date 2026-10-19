@@ -64,7 +64,8 @@ flowchart TD
    * Расчет доходностей (+15м, +1ч, +4ч, +24ч), пре-новостных утечек (Pre-event Drift), всплесков объемов и просадок.
    * Автоматическая валидация прогнозов LLM (Win Rate / Directional Alignment) с записью в таблицу `news_market_impact`.
 
-> 📖 Подробное описание сквозного пайплайна и схемы БД см. в [**`docs/ARCHITECTURE.md`**](file:///Users/isnov/Documents/Git/news-analysis/docs/ARCHITECTURE.md).
+> 📖 Подробное описание сквозного пайплайна и схемы БД см. в [**`docs/ARCHITECTURE.md`**](file:///Users/isnov/Documents/Git/news-analysis/docs/ARCHITECTURE.md).  
+> 🗺 Дорожную карту развития (рынок РФ, Telegram-пампы, мульти-LLM и алгобот) см. в [**`ROADMAP.md`**](file:///Users/isnov/Documents/Git/news-analysis/ROADMAP.md).
 
 ---
 
