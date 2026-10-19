@@ -2,13 +2,25 @@
 
 import logging
 import re
-from typing import Optional
-from openai import AsyncOpenAI, RateLimitError, APIConnectionError, BadRequestError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from openai import (
+    APIConnectionError,
+    AsyncOpenAI,
+    BadRequestError,
+    LengthFinishReasonError,
+    RateLimitError,
+)
+from pydantic import ValidationError
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from config import settings
+from prompt import FALLBACK_JSON_INSTRUCTION, SYSTEM_PROMPT, build_analysis_user_prompt
 from schema import SentimentAnalysisResult
-from prompt import SYSTEM_PROMPT, FALLBACK_JSON_INSTRUCTION, build_analysis_user_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +121,7 @@ class SentimentAnalyzer:
                     parsed_result.reasoning = think_reasoning.strip()
                 return parsed_result
 
-        except BadRequestError as bad_req:
-            # Ошибки превышения контекста пробрасываем выше для адаптивной обрезки
-            raise bad_req
-        except Exception as parse_err:
+        except (LengthFinishReasonError, ValidationError) as parse_err:
             logger.warning(
                 "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой <think> тегов...",
                 parse_err,
