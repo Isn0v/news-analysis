@@ -19,18 +19,25 @@ echo "Температура:  $TEMP"
 echo "KV-кэш:       ${KV_BITS}-bit (оптимизировано под 24 GB RAM)"
 echo "=========================================================="
 
-# Проверяем наличие модуля mlx_lm
-if ! python3 -c "import mlx_lm" >/dev/null 2>&1; then
-    echo "⚠️ Пакет mlx_lm не найден. Устанавливаем через uv/pip..."
-    if command -v uv >/dev/null 2>&1; then
-        uv pip install --system mlx-lm || uv pip install mlx-lm
-    else
-        pip install mlx-lm
-    fi
+# Поиск исполняемого файла сервера (uv tool или системный PATH)
+if command -v mlx_lm.server >/dev/null 2>&1; then
+    SERVER_CMD="mlx_lm.server"
+elif [ -x "$HOME/.local/bin/mlx_lm.server" ]; then
+    SERVER_CMD="$HOME/.local/bin/mlx_lm.server"
+elif [ -x "$HOME/.local/share/uv/tools/mlx-lm/bin/mlx_lm.server" ]; then
+    SERVER_CMD="$HOME/.local/share/uv/tools/mlx-lm/bin/mlx_lm.server"
+elif command -v uvx >/dev/null 2>&1; then
+    SERVER_CMD="uvx --from mlx-lm mlx_lm.server"
+else
+    echo "❌ Ошибка: mlx_lm.server не найден ни в PATH, ни в ~/.local/bin/."
+    echo "Установите через: uv tool install mlx-lm"
+    exit 1
 fi
 
+echo "Используется исполняемый файл: $SERVER_CMD"
+
 # Запуск OpenAI-совместимого сервера
-exec python3 -m mlx_lm.server \
+exec $SERVER_CMD \
     --model "$MODEL" \
     --host "$HOST" \
     --port "$PORT" \
