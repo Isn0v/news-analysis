@@ -21,8 +21,7 @@ market-evaluator/
 ├── sql/
 │   ├── fetch_unevaluated_news.sql   # Выборка новостей, ожидающих оценки рынка
 │   ├── get_evaluation_stats.sql     # Расчет общей аналитики точности (Win Rate)
-│   ├── save_market_impact.sql       # Сохранение метрик в news_market_impact
-│   └── schema.sql                   # DDL таблицы news_market_impact и индексов
+│   └── save_market_impact.sql       # Сохранение метрик в news_market_impact
 ├── tests/
 │   ├── test_binance_client.py       # Тесты резолвера тикеров и маппинга символов
 │   ├── test_db_integration.py       # Интеграционные тесты с БД

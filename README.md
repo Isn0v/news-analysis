@@ -49,11 +49,12 @@ flowchart TD
 
 2. **`db` (PostgreSQL 15):**
    * Центральное хранилище сырых статей и результатов квантитативной разметки.
-   * Партиционированный индекс `idx_raw_news_unprocessed` по `(timestamp_utc DESC) WHERE processed = FALSE` для мгновенной выборки новых статей воркером.
+   * Партиционированный индекс `idx_raw_news_queue` по `(timestamp_utc ASC) WHERE processed = FALSE AND (locked_until IS NULL OR locked_until < NOW())` для мгновенной бесколлизионной выборки статей распределенными воркерами.
    * Поле `llm_result JSONB` для гибкого хранения структурированного отчета.
+   * Централизованные версионированные миграции схемы через [`migrations/`](file:///Users/isnov/Documents/Git/news-analysis/migrations) и команду `make db-migrate`.
 
 3. **[`llm`](file:///Users/isnov/Documents/Git/news-analysis/llm/README.md) (Python 3.12 + uv):**
-   * Асинхронный воркер (`SentimentWorker`) с семафорным контролем параллелизма.
+   * Распределенный асинхронный воркер (`SentimentWorker`) с атомарным захватом очереди (`FOR UPDATE SKIP LOCKED`) и поддержкой горизонтального масштабирования на любое число инстансов.
    * Гарантированная Pydantic-валидация через OpenAI-совместимый протокол Structured Outputs.
    * Поддержка цепочек рассуждений моделей DeepSeek-R1 (автоматическое извлечение и изоляция блоков `<think>...</think>`).
    * Внешние `.sql` файлы для работы с БД через пул соединений `psycopg3`.
@@ -160,6 +161,8 @@ make up
 | `MAX_CONCURRENT_REQUESTS` | `2` | Количество параллельных запросов к LLM (Semaphore) |
 | `MAX_CONTENT_CHARS` | `6000` | Максимальная длина статьи, передаваемая в промпт |
 | `POLL_INTERVAL_SECONDS` | `10` | Пауза опроса очереди при отсутствии новых статей |
+| `WORKER_ID` | Auto-generated (`worker-{host}-{uuid}`) | Идентификатор инстанса воркера для распределенной очереди |
+| `LOCK_TIMEOUT_MINUTES` | `15` | Таймаут удержания блокировки статьи в минутах |
 | `LOG_LEVEL` | `INFO` | Уровень логирования (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ---
@@ -194,12 +197,18 @@ make eval-stats  # Вывести институциональную табли�
 make eval-batch  # Пакетная валидация необработанных новостей на свечах Binance
 make db-export   # Экспорт всех датасетов в CSV/JSON в папку ./exports/
 
+# Управление базой данных и миграциями
+make db-migrate  # Применить версионированные миграции из migrations/
+make llm-reset   # Сбросить статус обработки новостей для повторного прогона
+
 # Локальный инференс LLM (Apple Silicon & Ollama)
 make mlx-serve          # Запустить нативный Apple MLX сервер Qwen 3.8 27B (порт 8080)
 make qwen-ollama-setup  # Создать модель qwen-fast в Ollama (num_ctx 8192, temp 0.2)
 make ollama-setup       # Настроить модель deepseek-r1:14b в Ollama (num_ctx 16k)
 
-# Запуск тестов всего комплекса
+# Проверка качества кода и тесты
+make lint        # Проверить код линтером (Go vet + Ruff)
+make format      # Автоформатирование кода (Ruff format)
 make test        # Запуск полного набора тестов (Go + LLM + Market Evaluator)
 make test-llm    # Только тесты LLM-воркера
 make test-eval   # Только тесты Market Evaluator
@@ -209,11 +218,11 @@ make test-eval   # Только тесты Market Evaluator
 
 ## 🔍 Полезные SQL-запросы для аналитики
 
-Все вспомогательные аналитические запросы собраны в папке [`sql/`](file:///Users/isnov/git/news-analysis/sql):
+Все вспомогательные аналитические запросы собраны в папках [`llm/sql/`](file:///Users/isnov/Documents/Git/news-analysis/llm/sql) и [`market-evaluator/sql/`](file:///Users/isnov/Documents/Git/news-analysis/market-evaluator/sql):
 
 ```bash
 # Проверить количество обработанных и ожидающих новостей:
-docker compose exec -T db psql -U trader -d crypto_news -f /dev/stdin < sql/total_count.sql
+docker compose exec -T db psql -U trader -d crypto_news -f /dev/stdin < llm/sql/get_table_stats.sql
 
 # Посмотреть последние 3 размеченные новости с полным JSON-сентиментом:
 docker compose exec -T db psql -U trader -d crypto_news -c "

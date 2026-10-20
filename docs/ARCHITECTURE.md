@@ -58,10 +58,11 @@ flowchart TD
    * Новость сохраняется в PostgreSQL в таблицу `raw_news` со статусом `processed = FALSE`. При совпадении URL запись пропускается (`ON CONFLICT (url) DO NOTHING`).
 
 2. **Фаза квантитативного анализа сентимента (`llm`):**
-   * Демон `SentimentWorker` забирает пачку самых старых необработанных статей (`processed = FALSE`) в хронологическом порядке (`ORDER BY timestamp_utc ASC`).
-   * Через `asyncio.Semaphore` статьи отправляются на инференс в LLM (локальный через Ollama или высокоскоростной через Groq LPU Cloud).
+   * Демон `SentimentWorker` атомарно захватывает пачку необработанных статей (`SELECT ... FOR UPDATE SKIP LOCKED` с обновлением `locked_until` и `locked_by`).
+   * Параллельные инстансы воркеров могут быть запущены на разных процессах, машинах или видеокартах без коллизий и дублирования обработки.
+   * Через `asyncio.Semaphore` статьи отправляются на инференс в LLM (локальный Apple MLX / Ollama или облачный Groq LPU Cloud).
    * При работе с моделями без нативной поддержки `response_format=json_schema` сервис прозрачно переключается в режим `json_object` с автоматической инжекцией полного контракта полей (`FALLBACK_JSON_INSTRUCTION`).
-   * Полученный 11-мерный структурированный объект `SentimentAnalysisResult` сохраняется в поле `llm_result JSONB`, а флаг `processed` переводится в `TRUE`.
+   * Полученный 11-мерный структурированный объект `SentimentAnalysisResult` сохраняется в поле `llm_result JSONB`, блокировка сбрасывается, а флаг `processed` переводится в `TRUE`. В случае инфраструктурного сбоя блокировка немедленно снимается для передачи задачи другим воркерам.
 
 3. **Фаза рыночной валидации (`market-evaluator`):**
    * Воркер `MarketEvaluationWorker` выбирает новости, где `processed = TRUE AND market_evaluated = FALSE`.
@@ -99,6 +100,11 @@ CREATE TABLE IF NOT EXISTS raw_news (
     llm_result          JSONB,
     market_evaluated    BOOLEAN DEFAULT FALSE,
     market_evaluated_at TIMESTAMP,
+
+    -- Поля распределенной очереди инференса (миграция 002)
+    locked_until        TIMESTAMPTZ,
+    locked_by           VARCHAR(100),
+
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -107,6 +113,10 @@ CREATE INDEX IF NOT EXISTS idx_raw_news_unprocessed
 
 CREATE INDEX IF NOT EXISTS idx_raw_news_market_unevaluated
     ON raw_news (timestamp_utc DESC) WHERE processed = TRUE AND market_evaluated = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_raw_news_queue
+    ON raw_news (timestamp_utc ASC)
+    WHERE processed = FALSE AND (locked_until IS NULL OR locked_until < NOW());
 ```
 
 ### Таблица `news_market_impact`
@@ -164,6 +174,34 @@ CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timesta
 * **macOS (Apple Silicon M-series):** В силу ограничений виртуализации Docker на macOS графический стек Apple Metal не пробрасывается в контейнеры. Ollama запускается **нативно на хосте**, а контейнеры Docker обращаются к ней через сетевой шлюз `host.docker.internal:11434`.
 * **Groq LPU Cloud (Ультрабыстрый инференс):** При наличии ключа `GROQ_API_KEY` (или токена с префиксом `gsk_`) сервис автоматически перенаправляет запросы в облако Groq на модель `qwen/qwen3.8-27b`, обеспечивая скорость ~2.5 секунды на статью без утилизации ресурсов хоста.
 * **Linux (NVIDIA GPU):** Контейнер с Ollama или vLLM может быть развернут прямо в общем `docker-compose.yaml` с секцией `deploy.resources.reservations.devices`.
+
+### 3. Распределенный захват очереди (Distributed Lock & Leasing)
+Для безопасного горизонтального масштабирования инференса на произвольное число воркеров реализован паттерн атомарного CTE-захвата:
+```sql
+WITH next_batch AS (
+    SELECT id
+    FROM raw_news
+    WHERE processed = FALSE
+      AND (locked_until IS NULL OR locked_until < NOW())
+    ORDER BY timestamp_utc ASC
+    LIMIT %s
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE raw_news n
+SET locked_until = NOW() + (%s * INTERVAL '1 MINUTE'),
+    locked_by = %s
+FROM next_batch b
+WHERE n.id = b.id
+RETURNING n.id, n.title, n.content, n.description, n.source, n.categories;
+```
+* **Исключение гонок (No Race Conditions):** `FOR UPDATE SKIP LOCKED` пропускает строки, захваченные другими воркерами, не блокируя транзакцию.
+* **Автоматическое истечение лизинга:** при падении процесса блокировка истекает через `LOCK_TIMEOUT_MINUTES`, и статья возвращается в общую очередь.
+* **Мгновенный сброс:** при инфраструктурных сбоях (сеть, API таймаут) воркер освобождает статьи (`release_article_lock.sql`), позволяя другим нодам подхватить их немедленно.
+
+### 4. Централизованные транзакционные миграции (`migrations/`)
+Вся структура базы данных версионируется в папке `migrations/` и применяется утилитой `scripts/migrate.py` (`make db-migrate`).
+* Из прикладного кода сервисов (`llm`, `market-evaluator`) полностью исключены DDL-операции (`CREATE TABLE`, `ALTER TABLE`), что устраняет риски дедлоков схемы при одновременном старте нескольких контейнеров.
+* Таблица `schema_migrations` отслеживает статус примененных файлов миграций.
 
 ---
 

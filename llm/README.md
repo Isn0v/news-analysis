@@ -19,8 +19,9 @@
 ```text
 llm/
 ├── sql/
-│   ├── fetch_unprocessed_batch.sql  # Выборка пачки необработанных новостей (FIFO)
-│   ├── save_llm_result.sql          # Сохранение сентимента и обновление processed=TRUE
+│   ├── fetch_unprocessed_batch.sql  # Атомарный захват пачки с SKIP LOCKED и установкой locked_until
+│   ├── release_article_lock.sql     # Снятие блокировок со статей при прерывании или инфраструктурном сбое
+│   ├── save_llm_result.sql          # Сохранение сентимента, сброс блокировки и processed=TRUE
 │   └── get_table_stats.sql          # Подсчет статистики обработанных/ожидающих статей
 ├── tests/
 │   ├── test_analyzer.py             # Тесты извлечения JSON, обрезки <think> и fallback
@@ -71,9 +72,11 @@ llm/
 ## ⚙️ Логика обработки и отказоустойчивость
 
 ### 1. Архитектура воркера ([`worker.py`](file:///Users/isnov/Documents/Git/news-analysis/llm/worker.py))
-* **FIFO-очередь:** обработка новостей строго в хронологическом порядке (`ORDER BY timestamp_utc ASC`), что необходимо для корректного формирования истории свечей.
-* **Контроль параллелизма:** параллельные запросы к LLM ограничены семафором `asyncio.Semaphore(settings.max_concurrent_requests)`.
-* **Защита от «ядовитых пилюль»:** в случае критической ошибки парсинга статьи воркер не зависает, а вызывает `save_llm_error()` с записью ошибки в `llm_result` и выставляет `processed = TRUE`.
+* **Распределенная очередь (`SKIP LOCKED`):** захват новостей выполняется через атомарный CTE (`SELECT ... FOR UPDATE SKIP LOCKED` + `UPDATE raw_news SET locked_until, locked_by`). Это позволяет запускать неограниченное количество параллельных воркеров на разных процессах, контейнерах или серверах без коллизий и дублирования работы.
+* **Лизинг и таймаут блокировок:** если воркер аварийно завершится во время обработки статьи, блокировка автоматически истечет через `LOCK_TIMEOUT_MINUTES` (по умолчанию 15 минут), и статья вернется в очередь без вмешательства оператора.
+* **Graceful Lock Release:** при инфраструктурных сбоях (падение соединения с LLM, Rate Limit) воркер мгновенно сбрасывает блокировку через `release_article_lock.sql`, чтобы другие живые инстансы могли подхватить задачу.
+* **Контроль параллелизма:** параллельные запросы к LLM внутри одного инстанса ограничены семафором `asyncio.Semaphore(settings.max_concurrent_requests)`.
+* **Защита от «ядовитых пилюль»:** в случае критической ошибки парсинга или несоответствия формата воркер не зависает, а вызывает `save_llm_error()` с записью ошибки в `llm_result` и выставляет `processed = TRUE`.
 
 ### 2. Двухконтурный инференс ([`analyzer.py`](file:///Users/isnov/Documents/Git/news-analysis/llm/analyzer.py))
 * **Контур 1 (Structured Outputs API):** вызов `client.beta.chat.completions.parse()` со строгой схемой `response_format=SentimentAnalysisResult`. Мыслительный процесс `message.reasoning` переносится в поле `reasoning`.
@@ -105,6 +108,8 @@ llm/
 | `MAX_CONCURRENT_REQUESTS`| `2` | Число одновременных запросов к LLM (Semaphore) |
 | `MAX_CONTENT_CHARS` | `4000` | Максимальная длина статьи в промпте |
 | `POLL_INTERVAL_SECONDS` | `10` | Пауза при пустой очереди |
+| `WORKER_ID` | Auto-generated (`worker-{host}-{uuid}`) | Уникальный идентификатор инстанса воркера |
+| `LOCK_TIMEOUT_MINUTES` | `15` | Таймаут удержания блокировки статьи в минутах |
 
 > 💡 **Автоопределение Groq Cloud:** Если `GROQ_API_KEY` задан или `LLM_API_KEY` начинается с префикса `gsk_`, сервис автоматически подставит `LLM_BASE_URL=https://api.groq.com/openai/v1` и модель `qwen/qwen3.8-27b` (если модель не была задана явно), гарантируя ультрабыстрый инференс (~2.5 сек на статью) без нагрузки на локальный GPU.
 
@@ -124,7 +129,18 @@ uv run python main.py
 make llm-run
 ```
 
-### 2. Тестирование одиночной новости по ID (`--test-id`)
+### 2. Масштабирование: запуск нескольких параллельных воркеров
+Благодаря распределенному захвату очереди `SKIP LOCKED`, вы можете запустить произвольное число параллельных процессов:
+```bash
+# Воркер 1 (например, на локальном Apple MLX / GPU):
+WORKER_ID=worker-mlx uv run python main.py
+
+# Воркер 2 (параллельно на Groq Cloud API):
+WORKER_ID=worker-groq GROQ_API_KEY=gsk_... uv run python main.py
+```
+Оба воркера будут параллельно разбирать одну и ту же очередь без коллизий.
+
+### 3. Тестирование одиночной новости по ID (`--test-id`)
 Позволяет быстро протестировать промпт и ответ модели на конкретной статье из БД без непрерывного опроса очереди:
 ```bash
 # Тест с локальной Ollama:
@@ -134,12 +150,12 @@ uv run python main.py --test-id 18643
 uv run python main.py --test-id 18643 --token gsk_your_key_here --model qwen/qwen3.8-27b
 ```
 
-### 3. Переопределение параметров инференса через флаги CLI
+### 4. Переопределение параметров инференса через флаги CLI
 ```bash
 uv run python main.py --token gsk_xxx --model qwen/qwen3.8-27b --base-url https://api.groq.com/openai/v1
 ```
 
-### 4. Локальный инференс на Apple Silicon (MLX & Ollama)
+### 5. Локальный инференс на Apple Silicon (MLX & Ollama)
 ```bash
 # Вариант 1 (Рекомендуется для Apple Silicon — нативный Apple MLX сервер):
 make mlx-serve
