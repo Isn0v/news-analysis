@@ -7,9 +7,10 @@
 ---
 
 ## 📋 ЭТАП 1. Бесшовность и ускорение LLM-инференса (0 ₽ затрат)
-- [ ] **Многопоточный захват очереди в PostgreSQL (`SKIP LOCKED`):**
+- [x] **Многопоточный захват очереди в PostgreSQL (`SKIP LOCKED`):**
   - Заменить обычный `SELECT ... WHERE processed = FALSE` в `llm/sql/fetch_unprocessed_batch.sql` на атомарный захват через `FOR UPDATE SKIP LOCKED`.
   - Предотвратить дублирование обработки одних и тех же новостей параллельными репликами (Race Condition).
+  - Внедрена система версионированных миграций `migrations/` и команда `make db-migrate`.
 - [ ] **Параллельный дуэт воркеров (Groq + Google Gemini):**
   - Поднять в `docker-compose.yaml` независимые сервисы `llm-groq` (Qwen/Llama) и `llm-gemini` (`gemini-1.5-flash`).
   - Обойти минутные лимиты токенов (TPM) Groq за счет гигантского лимита Gemini Flash (1 000 000 TPM, 1 500 запросов/сутки бесплатно).

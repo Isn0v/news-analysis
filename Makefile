@@ -21,14 +21,12 @@ llm-run:
 	cd llm && uv run python main.py
 
 ## ollama-setup: настроить увеличенный контекст (16k) для локальной модели DeepSeek в Ollama
-ollama-setup:
-	@printf "FROM deepseek-r1:14b\nPARAMETER num_ctx 16384\n" > /tmp/Modelfile.deepseek && \
-	ollama create deepseek-r1:14b -f /tmp/Modelfile.deepseek && \
-	rm /tmp/Modelfile.deepseek
+deepseek-ollama-setup:
+	ollama create deepseek-news -f models/Modelfile.qwen
 
 ## qwen-ollama-setup: создать оптимизированную модель qwen-fast в Ollama (num_ctx 8192, temp 0.2, low reasoning)
 qwen-ollama-setup:
-	ollama create qwen-fast -f models/Modelfile.qwen
+	ollama create qwen-news -f models/Modelfile.qwen
 
 ## mlx-serve: запустить высокоскоростной локальный MLX-сервер Qwen 3.8 на Apple Silicon (порт 8080)
 mlx-serve:
@@ -37,6 +35,10 @@ mlx-serve:
 ## llm-reset: сбросить статус обработки новостей и подготовить к повторному инференсу
 llm-reset:
 	docker compose exec -T db psql -U trader -d crypto_news -c "UPDATE raw_news SET processed = FALSE, processed_at = NULL, llm_result = NULL; TRUNCATE TABLE news_market_impact;"
+
+## db-migrate: применить версионированные миграции БД из папки migrations/
+db-migrate:
+	uv run --project llm python scripts/migrate.py
 
 
 ## eval-run: запустить демон оценки рыночного влияния через uv
@@ -79,4 +81,3 @@ test-eval:
 
 ## test: запустить тесты по всем микросервисам
 test: test-collector test-llm test-eval
-

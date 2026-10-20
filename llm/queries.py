@@ -15,4 +15,5 @@ def _read_sql_file(filename: str) -> str:
 
 FETCH_UNPROCESSED_BATCH_QUERY = _read_sql_file("fetch_unprocessed_batch.sql")
 SAVE_LLM_RESULT_QUERY = _read_sql_file("save_llm_result.sql")
+RELEASE_ARTICLE_LOCK_QUERY = _read_sql_file("release_article_lock.sql")
 GET_TABLE_STATS_QUERY = _read_sql_file("get_table_stats.sql")

@@ -20,6 +20,7 @@ class SentimentWorker:
         self.db = DatabaseManager()
         self.analyzer = SentimentAnalyzer()
         self.running = False
+        self.worker_id = settings.worker_id
         self.semaphore = asyncio.Semaphore(settings.max_concurrent_requests)
 
     async def start(self):
@@ -29,7 +30,8 @@ class SentimentWorker:
 
         stats = await self.db.get_stats()
         logger.info(
-            "Старт воркера сентимента. Всего статей: %d | Обработано: %d | Ожидает: %d",
+            "Старт воркера сентимента [%s]. Всего статей: %d | Обработано: %d | Ожидает: %d",
+            self.worker_id,
             stats["total"],
             stats["processed"],
             stats["unprocessed"],
@@ -42,33 +44,37 @@ class SentimentWorker:
                     # Очередь пуста — ждём новые поступления от сборщика
                     await asyncio.sleep(settings.poll_interval_seconds)
             except asyncio.CancelledError:
-                logger.info("Получен сигнал отмены задачи воркера.")
+                logger.info("Получен сигнал отмены задачи воркера [%s].", self.worker_id)
                 break
             except Exception as e:
-                logger.error("Ошибка в цикле воркера: %s. Повтор через %dс...", e, settings.error_retry_delay_seconds, exc_info=True)
+                logger.error("[%s] Ошибка в цикле воркера: %s. Повтор через %dс...", self.worker_id, e, settings.error_retry_delay_seconds, exc_info=True)
                 await asyncio.sleep(settings.error_retry_delay_seconds)
 
         await self.db.close()
-        logger.info("Воркер сентимента успешно остановлен.")
+        logger.info("Воркер сентимента [%s] успешно остановлен.", self.worker_id)
 
     async def _process_batch(self) -> int:
-        """Извлекает и параллельно обрабатывает одну пачку новостей."""
-        batch = await self.db.fetch_unprocessed_batch(limit=settings.batch_size)
+        """Извлекает и параллельно обрабатывает одну пачку новостей (атомарный захват SKIP LOCKED)."""
+        batch = await self.db.fetch_unprocessed_batch(
+            limit=settings.batch_size,
+            worker_id=self.worker_id,
+            lock_timeout_minutes=settings.lock_timeout_minutes,
+        )
         if not batch:
             return 0
 
-        logger.info("Взята пачка из %d необработанных новостей...", len(batch))
+        logger.info("[%s] Взята пачка из %d необработанных новостей...", self.worker_id, len(batch))
 
         tasks = [self._process_single_article(article) for article in batch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         success = sum(1 for r in results if r is True)
-        logger.info("Пачка обработана: успешно %d / %d", success, len(batch))
+        logger.info("[%s] Пачка обработана: успешно %d / %d", self.worker_id, success, len(batch))
 
         # При инфраструктурных ошибках LLM делаем паузу во избежание быстрого спама в цикле
         infra_errors = [r for r in results if isinstance(r, (APIConnectionError, RateLimitError))]
         if infra_errors:
-            logger.warning("Обнаружены инфраструктурные ошибки LLM. Пауза %dс перед следующей попыткой...", settings.error_retry_delay_seconds)
+            logger.warning("[%s] Обнаружены инфраструктурные ошибки LLM. Пауза %dс перед следующей попыткой...", self.worker_id, settings.error_retry_delay_seconds)
             await asyncio.sleep(settings.error_retry_delay_seconds)
 
         return len(batch)
@@ -91,7 +97,8 @@ class SentimentWorker:
                 await self.db.save_llm_result(news_id=news_id, result=result)
 
                 logger.info(
-                    "✅ [ID %d | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
+                    "✅ [%s | ID %d | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
+                    self.worker_id,
                     news_id,
                     source,
                     title[:35],
@@ -104,11 +111,13 @@ class SentimentWorker:
                 return True
 
             except (APIConnectionError, RateLimitError) as infra_err:
-                logger.error("❌ Инфраструктурная ошибка LLM при анализе [ID %d] '%s': %s", news_id, title[:40], infra_err)
+                logger.error("❌ [%s] Инфраструктурная ошибка LLM при анализе [ID %d] '%s': %s", self.worker_id, news_id, title[:40], infra_err)
+                # Немедленно снимаем блокировку, чтобы другой живой воркер мог взять статью без ожидания таймаута
+                await self.db.release_locks([news_id])
                 raise infra_err
 
             except Exception as e:
-                logger.error("❌ Ошибка обработки статьи [ID %d] '%s': %s", news_id, title[:40], e)
+                logger.error("❌ [%s] Ошибка обработки статьи [ID %d] '%s': %s", self.worker_id, news_id, title[:40], e)
                 try:
                     await self.db.save_llm_error(news_id=news_id, error_message=str(e))
                     logger.warning("Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id)

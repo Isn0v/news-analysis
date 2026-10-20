@@ -12,6 +12,7 @@ from schema import SentimentAnalysisResult
 from queries import (
     FETCH_UNPROCESSED_BATCH_QUERY,
     SAVE_LLM_RESULT_QUERY,
+    RELEASE_ARTICLE_LOCK_QUERY,
     GET_TABLE_STATS_QUERY,
 )
 
@@ -47,12 +48,28 @@ class DatabaseManager:
             await self.pool.close()
             logger.info("Пул соединений PostgreSQL закрыт.")
 
-    async def fetch_unprocessed_batch(self, limit: int) -> List[Dict[str, Any]]:
-        """Извлекает пачку необработанных новостей из таблицы raw_news."""
+    async def fetch_unprocessed_batch(
+        self,
+        limit: int,
+        worker_id: Optional[str] = None,
+        lock_timeout_minutes: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Извлекает и атомарно блокирует пачку необработанных новостей (SKIP LOCKED)."""
+        wid = worker_id or settings.worker_id
+        timeout = lock_timeout_minutes or settings.lock_timeout_minutes
         async with self.pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
-                await cur.execute(FETCH_UNPROCESSED_BATCH_QUERY, (limit,))
+                await cur.execute(FETCH_UNPROCESSED_BATCH_QUERY, (limit, timeout, wid))
                 return await cur.fetchall()
+
+    async def release_locks(self, news_ids: List[int]):
+        """Снимает блокировку со статей, если их обработка была прервана."""
+        if not news_ids:
+            return
+        async with self.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(RELEASE_ARTICLE_LOCK_QUERY, (news_ids,))
+                await conn.commit()
 
     async def save_llm_result(self, news_id: int, result: SentimentAnalysisResult):
         """Сохраняет размеченный сентимент в JSONB-колонку llm_result и выставляет processed = TRUE."""
