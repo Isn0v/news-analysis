@@ -139,6 +139,18 @@ uv run python main.py --test-id 18643 --token gsk_your_key_here --model qwen/qwe
 uv run python main.py --token gsk_xxx --model qwen/qwen3.8-27b --base-url https://api.groq.com/openai/v1
 ```
 
+### 4. Локальный инференс на Apple Silicon (MLX & Ollama)
+```bash
+# Вариант 1 (Рекомендуется для Apple Silicon — нативный Apple MLX сервер):
+make mlx-serve
+# Поднимает OpenAI-совместимый сервер на порту 8080 с моделью mlx-community/Qwen3.8-27B-4bit,
+# 4-битным KV-кэшем и нативным reasoning_effort="low".
+
+# Вариант 2 (Через локальную Ollama с оптимизированным контекстом и температурой):
+make qwen-ollama-setup
+# Собирает модель qwen-fast на базе models/Modelfile.qwen (num_ctx 8192, temp 0.2).
+```
+
 ---
 
 ## 🧪 Запуск тестов

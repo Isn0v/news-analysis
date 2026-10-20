@@ -194,6 +194,11 @@ make eval-stats  # Вывести институциональную табли�
 make eval-batch  # Пакетная валидация необработанных новостей на свечах Binance
 make db-export   # Экспорт всех датасетов в CSV/JSON в папку ./exports/
 
+# Локальный инференс LLM (Apple Silicon & Ollama)
+make mlx-serve          # Запустить нативный Apple MLX сервер Qwen 3.8 27B (порт 8080)
+make qwen-ollama-setup  # Создать модель qwen-fast в Ollama (num_ctx 8192, temp 0.2)
+make ollama-setup       # Настроить модель deepseek-r1:14b в Ollama (num_ctx 16k)
+
 # Запуск тестов всего комплекса
 make test        # Запуск полного набора тестов (Go + LLM + Market Evaluator)
 make test-llm    # Только тесты LLM-воркера
