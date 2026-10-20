@@ -26,6 +26,14 @@ ollama-setup:
 	ollama create deepseek-r1:14b -f /tmp/Modelfile.deepseek && \
 	rm /tmp/Modelfile.deepseek
 
+## qwen-ollama-setup: создать оптимизированную модель qwen-fast в Ollama (num_ctx 8192, temp 0.2, low reasoning)
+qwen-ollama-setup:
+	ollama create qwen-fast -f models/Modelfile.qwen
+
+## mlx-serve: запустить высокоскоростной локальный MLX-сервер Qwen 3.8 на Apple Silicon (порт 8080)
+mlx-serve:
+	./scripts/run_mlx_qwen.sh
+
 ## llm-reset: сбросить статус обработки новостей и подготовить к повторному инференсу
 llm-reset:
 	docker compose exec -T db psql -U trader -d crypto_news -c "UPDATE raw_news SET processed = FALSE, processed_at = NULL, llm_result = NULL; TRUNCATE TABLE news_market_impact;"
