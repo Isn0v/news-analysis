@@ -21,8 +21,11 @@ llm-run:
 	cd llm && uv run python main.py
 
 ## ollama-setup: настроить увеличенный контекст (16k) для локальной модели DeepSeek в Ollama
+ollama-setup: deepseek-ollama-setup
+
+## deepseek-ollama-setup: создать оптимизированную модель DeepSeek в Ollama
 deepseek-ollama-setup:
-	ollama create deepseek-news -f models/Modelfile.qwen
+	ollama create deepseek-news -f models/Modelfile.deepseek
 
 ## qwen-ollama-setup: создать оптимизированную модель qwen-fast в Ollama (num_ctx 8192, temp 0.2, low reasoning)
 qwen-ollama-setup:
@@ -60,6 +63,16 @@ db-export:
 ## db-export-combined: экспортировать только итоговую объединённую таблицу (статья + LLM + рынок)
 db-export-combined:
 	cd market-evaluator && uv run python export.py --only combined --output-dir ./exports
+
+## lint: проверить код линтером (Go и Python)
+lint:
+	cd go-collector && go vet ./...
+	uvx ruff check llm market-evaluator scripts
+
+## format: отформатировать Python код с помощью ruff
+format:
+	uvx ruff format llm market-evaluator scripts
+	uvx ruff check --fix llm market-evaluator scripts
 
 ## test-collector: запустить тесты go-collector (с цветным выводом)
 test-collector:

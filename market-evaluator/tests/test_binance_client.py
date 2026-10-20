@@ -1,11 +1,12 @@
 """Тесты для клиента Binance API."""
 
-from datetime import datetime, timezone
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
-import httpx
 
+import httpx
+import pytest
 from binance_client import BinanceClient
+
 from models import Candle
 
 
@@ -53,7 +54,6 @@ def test_extract_tickers():
     assert BinanceClient.extract_tickers("") == []
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_klines_parsing():
     """Проверка корректного парсинга сырого JSON-ответа Binance в объекты Candle."""
@@ -64,14 +64,14 @@ async def test_fetch_klines_parsing():
     raw_mock_klines = [
         [
             1700000000000,  # 2023-11-14 22:13:20 UTC
-            "36000.50",     # Open
-            "36200.00",     # High
-            "35900.10",     # Low
-            "36150.00",     # Close
-            "125.450",      # Volume
+            "36000.50",  # Open
+            "36200.00",  # High
+            "35900.10",  # Low
+            "36150.00",  # Close
+            "125.450",  # Volume
             1700000899999,  # Close time
-            "4534567.89",   # Quote asset volume
-            1500,           # Number of trades
+            "4534567.89",  # Quote asset volume
+            1500,  # Number of trades
         ]
     ]
 
@@ -94,7 +94,7 @@ async def test_fetch_klines_parsing():
         assert len(candles) == 1
         c = candles[0]
         assert isinstance(c, Candle)
-        assert c.timestamp == datetime.fromtimestamp(1700000000, tz=timezone.utc)
+        assert c.timestamp == datetime.fromtimestamp(1700000000, tz=UTC)
         assert c.open == 36000.50
         assert c.high == 36200.00
         assert c.low == 35900.10

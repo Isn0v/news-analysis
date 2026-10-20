@@ -5,8 +5,8 @@
 """
 
 import asyncio
+
 import pytest
-from config import settings
 from db import DatabaseManager
 
 
@@ -16,7 +16,7 @@ async def _get_connected_db():
         async with asyncio.timeout(2.0):
             await db.initialize()
         return db
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if db.pool:
             await db.close()
         pytest.skip(f"PostgreSQL недоступен для интеграционного теста: {e}")

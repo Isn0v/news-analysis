@@ -2,8 +2,9 @@
 
 import logging
 from datetime import datetime
-from typing import List, Optional, Tuple
+
 from config import settings
+
 from models import Candle, EventStudyMetrics
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ class EventStudyEngine:
     @classmethod
     def compute(
         cls,
-        candles: List[Candle],
+        candles: list[Candle],
         t0_timestamp: datetime,
         ticker: str,
         symbol: str,
@@ -25,7 +26,7 @@ class EventStudyEngine:
         target_horizon_hours: int = 4,
         is_mean_reverting: bool = False,
         is_speculative: bool = False,
-    ) -> Optional[EventStudyMetrics]:
+    ) -> EventStudyMetrics | None:
         """Вычисляет полный набор метрик доходностей, просадок и точности прогноза."""
         if not candles:
             logger.warning("Нет свечей для расчета метрик по %s в момент %s", symbol, t0_timestamp)
@@ -58,11 +59,14 @@ class EventStudyEngine:
         volume_surge_ratio = t0_vol / avg_pre_vol if avg_pre_vol > 0 else 1.0
 
         candle_duration_ms = 15 * 60 * 1000
+
         # 3. Метрики ПОСЛЕ новости (Post-event горизонты)
-        def calc_return_at(offset_minutes: int) -> Optional[float]:
+        def calc_return_at(offset_minutes: int) -> float | None:
             target_ms = t0_ms + offset_minutes * 60 * 1000
             # Ищем первую свечу, закрытие которой произошло в target_ms или позже
-            matching = [c for c in post_candles if (int(c.timestamp.timestamp() * 1000) + candle_duration_ms) >= target_ms]
+            matching = [
+                c for c in post_candles if (int(c.timestamp.timestamp() * 1000) + candle_duration_ms) >= target_ms
+            ]
             if not matching:
                 # Еще не наступил этот момент времени
                 return None
@@ -98,7 +102,7 @@ class EventStudyEngine:
             is_impulse_confirmed = volatility_range_pct <= (thresh * 3.0)
 
         # 6. Проверка согласованности направления (Directional Alignment)
-        def check_alignment(ret: Optional[float]) -> Optional[bool]:
+        def check_alignment(ret: float | None) -> bool | None:
             if ret is None:
                 return None
             if lbl == "bullish" or sentiment_score > 0.1:

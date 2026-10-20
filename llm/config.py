@@ -1,5 +1,7 @@
 """Конфигурация сервиса анализа сентимента через Pydantic Settings."""
 
+from typing import Any
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,11 +41,12 @@ class Settings(BaseSettings):
     max_concurrent_requests: int = 2
     log_level: str = "INFO"
 
-    def model_post_init(self, __context):
+    def model_post_init(self, context: Any, /) -> None:
         # Если worker_id не задан явно через WORKER_ID, генерируем читаемый ID
         if not self.worker_id:
             import socket
             import uuid
+
             hostname = socket.gethostname()[:8]
             unique_hex = uuid.uuid4().hex[:4]
             self.worker_id = f"worker-{hostname}-{unique_hex}"
@@ -63,8 +66,7 @@ class Settings(BaseSettings):
     def postgres_dsn(self) -> str:
         if not self.postgres_password:
             raise ValueError(
-                "Переменная POSTGRES_PASSWORD не задана! "
-                "Укажите пароль в файле .env или через переменную окружения."
+                "Переменная POSTGRES_PASSWORD не задана! Укажите пароль в файле .env или через переменную окружения."
             )
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}@"

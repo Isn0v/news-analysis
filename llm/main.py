@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import signal
@@ -27,13 +28,11 @@ async def test_single_article(news_id: int):
     """Тестовый анализ одной статьи по ID для проверки токена и модели."""
     db = DatabaseManager()
     await db.initialize()
-    async with db.pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT id, title, content, description, source, categories FROM raw_news WHERE id = %s;",
-                (news_id,)
-            )
-            row = await cur.fetchone()
+    async with db.pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT id, title, content, description, source, categories FROM raw_news WHERE id = %s;", (news_id,)
+        )
+        row = await cur.fetchone()
 
     if not row:
         print(f"❌ Статья с ID {news_id} не найдена в базе данных.")
@@ -55,7 +54,7 @@ async def test_single_article(news_id: int):
         )
         print("\n✅ Успешный ответ модели:")
         print(json.dumps(res.model_dump(), indent=2, ensure_ascii=False))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\n❌ Ошибка анализа: {e}")
     finally:
         await db.close()
@@ -96,10 +95,8 @@ def main():
 
     # Регистрация обработчиков сигналов остановки
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
+        with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, worker.stop)
-        except NotImplementedError:
-            pass
 
     try:
         loop.run_until_complete(worker.start())

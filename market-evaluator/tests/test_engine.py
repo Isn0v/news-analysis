@@ -1,18 +1,18 @@
 """Тесты математического движка анализа событий (EventStudyEngine)."""
 
-from datetime import datetime, timezone, timedelta
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from engine import EventStudyEngine
+
 from models import Candle, EventStudyMetrics
 
 
 def generate_candle_series(
     t0_dt: datetime,
-    pre_count: int = 16,     # 4 часа до (16 свечей по 15м)
-    post_count: int = 96,    # 24 часа после (96 свечей по 15м)
+    pre_count: int = 16,  # 4 часа до (16 свечей по 15м)
+    post_count: int = 96,  # 24 часа после (96 свечей по 15м)
     base_price: float = 100.0,
-    price_path: list[float] = None,
+    price_path: list[float] | None = None,
     t0_volume_multiplier: float = 3.0,
 ) -> list[Candle]:
     """Генерирует синтетический ряд 15-минутных свечей вокруг момента события t0."""
@@ -22,17 +22,14 @@ def generate_candle_series(
 
     for i in range(total_count):
         candle_dt = start_dt + timedelta(minutes=i * 15)
-        
+
         # Объем: средний 10.0, на свече t0 (индекс pre_count) всплеск
         volume = 10.0
         if i == pre_count:
             volume = 10.0 * t0_volume_multiplier
 
         # Цена
-        if price_path is not None and i < len(price_path):
-            p = price_path[i]
-        else:
-            p = base_price
+        p = price_path[i] if price_path is not None and i < len(price_path) else base_price
 
         candles.append(
             Candle(
@@ -50,8 +47,8 @@ def generate_candle_series(
 
 def test_compute_bullish_impact_confirmed():
     """Тест: бычья новость приводит к росту цены и всплеску объема (гипотеза подтверждена)."""
-    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
-    
+    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
+
     # 4 свечи до (по 100.0), свеча t0 (100.0, объем x3.0),
     # через 1 час (4 свечи после t0) цена вырастает до 105.0 (+5%),
     # через 4 часа (16 свечей после t0) цена держится на 108.0 (+8%).
@@ -119,7 +116,7 @@ def test_compute_bullish_impact_confirmed():
 
 def test_compute_bearish_failed_prediction():
     """Тест: медвежья новость, но цена вопреки прогнозу выросла (ошибка модели)."""
-    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
     candles = generate_candle_series(t0_dt=t0, pre_count=16, post_count=96, base_price=100.0)
 
     # Цена на t0 и после новости только растет (low не падает ниже 100.0)
@@ -156,7 +153,7 @@ def test_compute_bearish_failed_prediction():
 
 def test_compute_mean_reverting():
     """Тест: новость с ожиданием возврата к среднему (mean-reversion)."""
-    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
     candles = generate_candle_series(t0_dt=t0, pre_count=16, post_count=96, base_price=100.0)
 
     # Начальный импульс: первые 2 свечи взлетают до 105.0
@@ -194,7 +191,7 @@ def test_compute_mean_reverting():
 
 def test_compute_insufficient_candles():
     """Тест: обработка граничных случаев (пустой список свечей)."""
-    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    t0 = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
     res = EventStudyEngine.compute(
         candles=[],
         t0_timestamp=t0,

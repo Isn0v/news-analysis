@@ -17,21 +17,21 @@ import argparse
 import csv
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import psycopg
-from psycopg.rows import dict_row
 
 # Load settings from market-evaluator config (reads ../.env)
 from config import settings
-
+from psycopg.rows import dict_row
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _json_default(obj: Any) -> Any:
     """JSON serializer for types not serializable by default."""
@@ -52,8 +52,7 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
         for row in rows:
             # Serialize nested objects (JSONB) to strings in CSV
             flat = {
-                k: (json.dumps(v, default=_json_default) if isinstance(v, (dict, list)) else v)
-                for k, v in row.items()
+                k: (json.dumps(v, default=_json_default) if isinstance(v, (dict, list)) else v) for k, v in row.items()
             }
             writer.writerow(flat)
     print(f"  [OK] {path.name}  ({len(rows):,} rows, {path.stat().st_size / 1024:.1f} KB)")
@@ -200,6 +199,7 @@ ORDER BY n.timestamp_utc ASC, m.ticker ASC;
 # Export logic
 # ---------------------------------------------------------------------------
 
+
 def fetch(conn: psycopg.Connection, query: str) -> list[dict]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(query)
@@ -209,13 +209,12 @@ def fetch(conn: psycopg.Connection, query: str) -> list[dict]:
 def export_all(output_dir: Path, only: str | None = None) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     print(f"\n📦 Export started — output: {output_dir.resolve()}")
     print(f"   Timestamp: {ts}")
     print(f"   Database:  {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}\n")
 
     with psycopg.connect(settings.postgres_dsn) as conn:
-
         # 1. raw_news + LLM
         if only in (None, "raw"):
             print("→ Exporting raw_news + LLM results...")
@@ -244,6 +243,7 @@ def export_all(output_dir: Path, only: str | None = None) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Export crypto news analysis data to CSV and JSON",
@@ -271,7 +271,7 @@ Examples:
 
     try:
         export_all(Path(args.output_dir), only=args.only)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\n❌ Export failed: {e}", file=sys.stderr)
         sys.exit(1)
 

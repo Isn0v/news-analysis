@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import signal
 import sys
@@ -38,10 +39,8 @@ async def async_main():
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
+        with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, worker.stop)
-        except NotImplementedError:
-            pass
 
     try:
         if args.stats:
@@ -79,17 +78,37 @@ async def async_main():
                         print(f"Базовая цена (P0):     ${m.p0_price:,.4f}")
                         print(f"Pre-News Drift (-4ч):   {m.pre_drift_pct:+.2f}%")
                         print(f"Всплеск объема на t0:  x{m.volume_surge_ratio:.2f}")
-                        print(f"Доходность +15м:       {f'{m.return_15m_pct:+.2f}%' if m.return_15m_pct is not None else 'N/A'}")
-                        print(f"Доходность +1ч:        {f'{m.return_1h_pct:+.2f}%' if m.return_1h_pct is not None else 'N/A'}")
-                        print(f"Доходность +4ч:        {f'{m.return_4h_pct:+.2f}%' if m.return_4h_pct is not None else 'N/A'}")
-                        print(f"Доходность +24ч:       {f'{m.return_24h_pct:+.2f}%' if m.return_24h_pct is not None else 'N/A'}")
+                        print(
+                            f"Доходность +15м:       {f'{m.return_15m_pct:+.2f}%' if m.return_15m_pct is not None else 'N/A'}"
+                        )
+                        print(
+                            f"Доходность +1ч:        {f'{m.return_1h_pct:+.2f}%' if m.return_1h_pct is not None else 'N/A'}"
+                        )
+                        print(
+                            f"Доходность +4ч:        {f'{m.return_4h_pct:+.2f}%' if m.return_4h_pct is not None else 'N/A'}"
+                        )
+                        print(
+                            f"Доходность +24ч:       {f'{m.return_24h_pct:+.2f}%' if m.return_24h_pct is not None else 'N/A'}"
+                        )
                         print(f"Макс. взлет (Run-up):  {m.max_runup_pct:+.2f}%")
-                        print(f"Оценка LLM:            {m.sentiment_label} (скор {m.sentiment_score:+0.2f}, импакт {m.impact_magnitude}/10)")
-                        print(f"Целевой горизонт LLM:  {m.target_horizon_hours} ч (Откат: {'Да' if m.is_mean_reverting_expected else 'Нет'})")
-                        print(f"Первичный импульс (2ч): {'✅ Сработал' if m.is_impulse_confirmed else '❌ Не сработал'}")
-                        target_status = '✅ Подтвержден' if m.is_target_horizon_aligned else ('❌ Не подтвержден' if m.is_target_horizon_aligned is False else '⏳ В ожидании')
+                        print(
+                            f"Оценка LLM:            {m.sentiment_label} (скор {m.sentiment_score:+0.2f}, импакт {m.impact_magnitude}/10)"
+                        )
+                        print(
+                            f"Целевой горизонт LLM:  {m.target_horizon_hours} ч (Откат: {'Да' if m.is_mean_reverting_expected else 'Нет'})"
+                        )
+                        print(
+                            f"Первичный импульс (2ч): {'✅ Сработал' if m.is_impulse_confirmed else '❌ Не сработал'}"
+                        )
+                        target_status = (
+                            "✅ Подтвержден"
+                            if m.is_target_horizon_aligned
+                            else ("❌ Не подтвержден" if m.is_target_horizon_aligned is False else "⏳ В ожидании")
+                        )
                         print(f"Целевой горизонт ({m.target_horizon_hours}ч): {target_status}")
-                        print(f"Сетка фикс-горизонтов: 1ч: {'✅' if m.is_aligned_1h else '❌'} | 4ч: {'✅' if m.is_aligned_4h else '❌'}")
+                        print(
+                            f"Сетка фикс-горизонтов: 1ч: {'✅' if m.is_aligned_1h else '❌'} | 4ч: {'✅' if m.is_aligned_4h else '❌'}"
+                        )
                         print("-" * 60)
 
         elif args.batch:

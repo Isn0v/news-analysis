@@ -24,11 +24,11 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 15.0
 
     # Параметры Event Study
-    pre_window_hours: int = 4       # Окно ДО новости (для оценки фона и утечек)
-    post_window_hours: int = 24     # Окно ПОСЛЕ новости (для оценки тренда)
-    candle_interval: str = "15m"    # Таймфрейм свечей (15m, 5m, 1h)
+    pre_window_hours: int = 4  # Окно ДО новости (для оценки фона и утечек)
+    post_window_hours: int = 24  # Окно ПОСЛЕ новости (для оценки тренда)
+    candle_interval: str = "15m"  # Таймфрейм свечей (15m, 5m, 1h)
     neutral_threshold_pct: float = 0.2  # Порог отнесения движения к нейтральному (+-0.2%)
-    min_news_age_hours: float = 4.0     # Минимальный возраст новости для оценки в воркере
+    min_news_age_hours: float = 4.0  # Минимальный возраст новости для оценки в воркере
 
     # Параметры воркера
     batch_size: int = 5
@@ -39,8 +39,7 @@ class Settings(BaseSettings):
     def postgres_dsn(self) -> str:
         if not self.postgres_password:
             raise ValueError(
-                "Переменная POSTGRES_PASSWORD не задана! "
-                "Укажите пароль в файле .env или через переменную окружения."
+                "Переменная POSTGRES_PASSWORD не задана! Укажите пароль в файле .env или через переменную окружения."
             )
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}@"
@@ -49,4 +48,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

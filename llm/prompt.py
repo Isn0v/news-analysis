@@ -1,6 +1,5 @@
 """System and user prompt definitions for institutional cryptocurrency sentiment analysis."""
 
-from typing import Optional
 from config import settings
 
 SYSTEM_PROMPT = """You are a Senior Quantitative Crypto Research Analyst and Financial NLP Specialist at a top digital assets quantitative hedge fund.
@@ -90,7 +89,7 @@ def build_analysis_user_prompt(
     source: str,
     categories: list[str],
     content: str,
-    max_chars: Optional[int] = None,
+    max_chars: int | None = None,
 ) -> str:
     """Builds a structured user prompt for news analysis with length truncation."""
     limit = max_chars if max_chars is not None else settings.max_content_chars

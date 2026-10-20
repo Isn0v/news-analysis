@@ -4,11 +4,10 @@ import asyncio
 import logging
 from typing import Any
 
-from openai import APIConnectionError, RateLimitError
-
 from analyzer import SentimentAnalyzer
 from config import settings
 from db import DatabaseManager
+from openai import APIConnectionError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +45,13 @@ class SentimentWorker:
             except asyncio.CancelledError:
                 logger.info("Получен сигнал отмены задачи воркера [%s].", self.worker_id)
                 break
-            except Exception as e:
-                logger.error("[%s] Ошибка в цикле воркера: %s. Повтор через %dс...", self.worker_id, e, settings.error_retry_delay_seconds, exc_info=True)
+            except Exception as e:  # noqa: BLE001
+                logger.exception(
+                    "[%s] Ошибка в цикле воркера: %s. Повтор через %dс...",
+                    self.worker_id,
+                    e,
+                    settings.error_retry_delay_seconds,
+                )
                 await asyncio.sleep(settings.error_retry_delay_seconds)
 
         await self.db.close()
@@ -74,7 +78,11 @@ class SentimentWorker:
         # При инфраструктурных ошибках LLM делаем паузу во избежание быстрого спама в цикле
         infra_errors = [r for r in results if isinstance(r, (APIConnectionError, RateLimitError))]
         if infra_errors:
-            logger.warning("[%s] Обнаружены инфраструктурные ошибки LLM. Пауза %dс перед следующей попыткой...", self.worker_id, settings.error_retry_delay_seconds)
+            logger.warning(
+                "[%s] Обнаружены инфраструктурные ошибки LLM. Пауза %dс перед следующей попыткой...",
+                self.worker_id,
+                settings.error_retry_delay_seconds,
+            )
             await asyncio.sleep(settings.error_retry_delay_seconds)
 
         return len(batch)
@@ -110,18 +118,26 @@ class SentimentWorker:
                 )
                 return True
 
-            except (APIConnectionError, RateLimitError) as infra_err:
-                logger.error("❌ [%s] Инфраструктурная ошибка LLM при анализе [ID %d] '%s': %s", self.worker_id, news_id, title[:40], infra_err)
+            except (APIConnectionError, RateLimitError):
+                logger.error(
+                    "❌ [%s] Инфраструктурная ошибка LLM при анализе [ID %d] '%s'",
+                    self.worker_id,
+                    news_id,
+                    title[:40],
+                    exc_info=True,
+                )
                 # Немедленно снимаем блокировку, чтобы другой живой воркер мог взять статью без ожидания таймаута
                 await self.db.release_locks([news_id])
-                raise infra_err
+                raise
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error("❌ [%s] Ошибка обработки статьи [ID %d] '%s': %s", self.worker_id, news_id, title[:40], e)
                 try:
                     await self.db.save_llm_error(news_id=news_id, error_message=str(e))
-                    logger.warning("Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id)
-                except Exception as db_err:
+                    logger.warning(
+                        "Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id
+                    )
+                except Exception as db_err:  # noqa: BLE001
                     logger.error("Не удалось сохранить статус ошибки для статьи [ID %d]: %s", news_id, db_err)
                 return False
 

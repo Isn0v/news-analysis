@@ -3,6 +3,7 @@
 import logging
 import re
 
+from config import settings
 from openai import (
     APIConnectionError,
     AsyncOpenAI,
@@ -10,17 +11,15 @@ from openai import (
     LengthFinishReasonError,
     RateLimitError,
 )
+from prompt import FALLBACK_JSON_INSTRUCTION, SYSTEM_PROMPT, build_analysis_user_prompt
 from pydantic import ValidationError
+from schema import SentimentAnalysisResult
 from tenacity import (
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
-
-from config import settings
-from prompt import FALLBACK_JSON_INSTRUCTION, SYSTEM_PROMPT, build_analysis_user_prompt
-from schema import SentimentAnalysisResult
 
 logger = logging.getLogger(__name__)
 

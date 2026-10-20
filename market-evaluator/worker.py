@@ -2,13 +2,14 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from datetime import UTC
+from typing import Any
 
+from binance_client import BinanceClient
 from config import settings
 from db import DatabaseManager
-from binance_client import BinanceClient
 from engine import EventStudyEngine
+
 from models import EventStudyMetrics
 
 logger = logging.getLogger(__name__)
@@ -31,12 +32,14 @@ class MarketEvaluationWorker:
         await self.binance.close()
         await self.db.close()
 
-    async def evaluate_article(self, article: Dict[str, Any]) -> List[EventStudyMetrics]:
+    async def evaluate_article(self, article: dict[str, Any]) -> list[EventStudyMetrics]:
         """Оценивает влияние одной статьи на все затронутые активы."""
         news_id = article["news_id"]
-        title = article["title"]
+        title = article.get("title", "")
         t0_timestamp = article["timestamp_utc"]
         llm_result = article.get("llm_result") or {}
+
+        logger.debug("Оценка новости [ID %d]: %s", news_id, title)
 
         if not t0_timestamp:
             logger.warning("У статьи [ID %d] нет timestamp_utc", news_id)
@@ -44,11 +47,13 @@ class MarketEvaluationWorker:
 
         # Обеспечиваем timezone-aware UTC
         if t0_timestamp.tzinfo is None:
-            t0_timestamp = t0_timestamp.replace(tzinfo=timezone.utc)
+            t0_timestamp = t0_timestamp.replace(tzinfo=UTC)
 
         # Классификация спекулятивности
         is_speculative = bool(llm_result.get("is_speculative", False))
         spec_reason = llm_result.get("speculation_reason", "")
+        if is_speculative and spec_reason:
+            logger.debug("Причина спекулятивности [ID %d]: %s", news_id, spec_reason)
 
         affected_assets = llm_result.get("affected_assets") or []
         # Fallback: если affected_assets пуст, пробуем извлечь из detected_currencies
@@ -56,7 +61,11 @@ class MarketEvaluationWorker:
             detected_currencies = llm_result.get("detected_currencies") or []
             sentiment_score = float(llm_result.get("sentiment_score", 0.0))
             affected_assets = [
-                {"ticker": cur.strip().upper(), "sentiment": sentiment_score, "reason": "Extracted from detected_currencies"}
+                {
+                    "ticker": cur.strip().upper(),
+                    "sentiment": sentiment_score,
+                    "reason": "Extracted from detected_currencies",
+                }
                 for cur in detected_currencies
                 if cur.strip()
             ]
@@ -97,7 +106,7 @@ class MarketEvaluationWorker:
                         start_time_ms=start_ms,
                         end_time_ms=end_ms,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning("Ошибка запроса свечей Binance для %s (новость ID %d): %s", symbol, news_id, e)
                     continue
 
@@ -138,11 +147,14 @@ class MarketEvaluationWorker:
         # Всегда помечаем новость как оцененную, чтобы исключить зацикливание воркера
         await self.db.mark_news_evaluated(news_id)
         if not results:
-            logger.info("ℹ️ [ID %d] Оценка завершена без метрик (активы не торгуются на Binance или нет свечей). Новость помечена обработанной.", news_id)
+            logger.info(
+                "ℹ️ [ID %d] Оценка завершена без метрик (активы не торгуются на Binance или нет свечей). Новость помечена обработанной.",
+                news_id,
+            )
 
         return results
 
-    async def evaluate_by_id(self, news_id: int) -> List[EventStudyMetrics]:
+    async def evaluate_by_id(self, news_id: int) -> list[EventStudyMetrics]:
         """Оценивает конкретную новость по ее ID."""
         article = await self.db.fetch_news_by_id(news_id)
         if not article:
@@ -190,8 +202,8 @@ class MarketEvaluationWorker:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error("Ошибка в цикле market-evaluator: %s", e, exc_info=True)
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Ошибка в цикле market-evaluator: %s", e)
                 await asyncio.sleep(10)
 
         logger.info("Демон market-evaluator остановлен.")

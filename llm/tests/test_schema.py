@@ -2,15 +2,9 @@
 
 import pytest
 from pydantic import ValidationError
-
 from schema import (
     SentimentAnalysisResult,
     SentimentLabel,
-    InformationType,
-    MarketSurprise,
-    TransmissionChannel,
-    TimeHorizon,
-    AssetImpact,
 )
 
 

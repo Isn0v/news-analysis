@@ -1,17 +1,21 @@
 """Асинхронный клиент к публичному REST API биржи Binance."""
 
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
-import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import re
+from datetime import UTC, datetime
 
+import httpx
 from config import settings
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
 from models import Candle
 
 logger = logging.getLogger(__name__)
-
-import re
 
 # Популярные исключения и алиасы
 KNOWN_TICKER_MAP = {
@@ -39,10 +43,41 @@ KNOWN_TICKER_MAP = {
 
 # Известные акции, индексы и не-крипто тикеры, которые не торгуются на спотовом Binance
 NON_CRYPTO_BLACKLIST = {
-    "TOTAL_CRYPTO", "GENERAL_CRYPTO", "DEFI", "STABLECOINS", "NFT", "RWA", "MEMES",
-    "AMC", "ROBINHOOD", "HOOD", "ORCL", "ORACLE", "NVDA", "NVIDIA", "MU", "MICRON",
-    "FORD", "F", "AAPL", "APPLE", "TSLA", "TESLA", "MSFT", "MICROSOFT", "GOOG", "GOOGL",
-    "AMZN", "AMAZON", "META", "SPY", "QQQ", "GME", "COIN", "COINBASE", "MSTR",
+    "TOTAL_CRYPTO",
+    "GENERAL_CRYPTO",
+    "DEFI",
+    "STABLECOINS",
+    "NFT",
+    "RWA",
+    "MEMES",
+    "AMC",
+    "ROBINHOOD",
+    "HOOD",
+    "ORCL",
+    "ORACLE",
+    "NVDA",
+    "NVIDIA",
+    "MU",
+    "MICRON",
+    "FORD",
+    "F",
+    "AAPL",
+    "APPLE",
+    "TSLA",
+    "TESLA",
+    "MSFT",
+    "MICROSOFT",
+    "GOOG",
+    "GOOGL",
+    "AMZN",
+    "AMAZON",
+    "META",
+    "SPY",
+    "QQQ",
+    "GME",
+    "COIN",
+    "COINBASE",
+    "MSTR",
 }
 
 
@@ -62,7 +97,7 @@ class BinanceClient:
         await self.client.aclose()
 
     @classmethod
-    def extract_tickers(cls, raw_ticker: str) -> List[str]:
+    def extract_tickers(cls, raw_ticker: str) -> list[str]:
         """Извлекает и разделяет тикеры, если модель вернула объединенную строку (напр. 'BTC, ETH')."""
         if not raw_ticker:
             return []
@@ -70,7 +105,7 @@ class BinanceClient:
         return [p for p in parts if p]
 
     @classmethod
-    def resolve_symbol(cls, ticker: str) -> Optional[str]:
+    def resolve_symbol(cls, ticker: str) -> str | None:
         """Преобразует тикер актива в торговую пару Binance (например, BTC -> BTCUSDT)."""
         clean = ticker.upper().strip().replace("$", "")
 
@@ -92,7 +127,6 @@ class BinanceClient:
 
         return f"{clean}USDT"
 
-
     @retry(
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -106,7 +140,7 @@ class BinanceClient:
         start_time_ms: int,
         end_time_ms: int,
         limit: int = 1000,
-    ) -> List[Candle]:
+    ) -> list[Candle]:
         """Запрашивает исторические свечи OHLCV с Binance."""
         url = "/api/v3/klines"
         params = {
@@ -128,7 +162,7 @@ class BinanceClient:
 
         candles = []
         for c in raw_candles:
-            candle_dt = datetime.fromtimestamp(c[0] / 1000, tz=timezone.utc)
+            candle_dt = datetime.fromtimestamp(c[0] / 1000, tz=UTC)
             candles.append(
                 Candle(
                     timestamp=candle_dt,
