@@ -271,7 +271,7 @@ Examples:
 
     try:
         export_all(Path(args.output_dir), only=args.only)
-    except Exception as e:  # noqa: BLE001
+    except (psycopg.Error, OSError, ValueError) as e:
         print(f"\n❌ Export failed: {e}", file=sys.stderr)
         sys.exit(1)
 

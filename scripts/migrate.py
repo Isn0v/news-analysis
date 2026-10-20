@@ -110,7 +110,7 @@ def run_migrations():
         print(f"❌ Не удалось подключиться к PostgreSQL ({db_host}:{db_port}): {e}")
         print("💡 Убедитесь, что база запущена: docker compose up -d db")
         sys.exit(1)
-    except Exception as e:  # noqa: BLE001
+    except (psycopg.Error, OSError) as e:
         print(f"❌ Ошибка применения миграции: {e}")
         sys.exit(1)
 

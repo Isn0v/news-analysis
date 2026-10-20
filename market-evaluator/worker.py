@@ -5,6 +5,8 @@ import logging
 from datetime import UTC
 from typing import Any
 
+import httpx
+import psycopg
 from binance_client import BinanceClient
 from config import settings
 from db import DatabaseManager
@@ -106,7 +108,7 @@ class MarketEvaluationWorker:
                         start_time_ms=start_ms,
                         end_time_ms=end_ms,
                     )
-                except Exception as e:  # noqa: BLE001
+                except (httpx.HTTPError, ValueError, KeyError) as e:
                     logger.warning("Ошибка запроса свечей Binance для %s (новость ID %d): %s", symbol, news_id, e)
                     continue
 
@@ -202,8 +204,8 @@ class MarketEvaluationWorker:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:  # noqa: BLE001
-                logger.exception("Ошибка в цикле market-evaluator: %s", e)
+            except (psycopg.Error, httpx.HTTPError) as infra_err:
+                logger.error("Инфраструктурная ошибка в цикле market-evaluator (DB/Binance): %s. Пауза 10с...", infra_err)
                 await asyncio.sleep(10)
 
         logger.info("Демон market-evaluator остановлен.")

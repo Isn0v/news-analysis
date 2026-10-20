@@ -9,6 +9,8 @@ import sys
 from analyzer import SentimentAnalyzer
 from config import settings
 from db import DatabaseManager
+from openai import APIError
+from pydantic import ValidationError
 from worker import SentimentWorker
 
 
@@ -54,7 +56,7 @@ async def test_single_article(news_id: int):
         )
         print("\n✅ Успешный ответ модели:")
         print(json.dumps(res.model_dump(), indent=2, ensure_ascii=False))
-    except Exception as e:  # noqa: BLE001
+    except (APIError, ValidationError, ValueError) as e:
         print(f"\n❌ Ошибка анализа: {e}")
     finally:
         await db.close()

@@ -4,10 +4,12 @@ import asyncio
 import logging
 from typing import Any
 
+import psycopg
 from analyzer import SentimentAnalyzer
 from config import settings
 from db import DatabaseManager
-from openai import APIConnectionError, RateLimitError
+from openai import APIConnectionError, APIError, RateLimitError
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +47,9 @@ class SentimentWorker:
             except asyncio.CancelledError:
                 logger.info("Получен сигнал отмены задачи воркера [%s].", self.worker_id)
                 break
-            except Exception as e:  # noqa: BLE001
-                logger.exception(
-                    "[%s] Ошибка в цикле воркера: %s. Повтор через %dс...",
+            except (psycopg.Error, APIConnectionError, RateLimitError) as e:
+                logger.error(
+                    "[%s] Инфраструктурная ошибка в цикле воркера (DB/LLM): %s. Повтор через %dс...",
                     self.worker_id,
                     e,
                     settings.error_retry_delay_seconds,
@@ -130,14 +132,14 @@ class SentimentWorker:
                 await self.db.release_locks([news_id])
                 raise
 
-            except Exception as e:  # noqa: BLE001
+            except (APIError, ValidationError, ValueError, KeyError) as e:
                 logger.error("❌ [%s] Ошибка обработки статьи [ID %d] '%s': %s", self.worker_id, news_id, title[:40], e)
                 try:
                     await self.db.save_llm_error(news_id=news_id, error_message=str(e))
                     logger.warning(
                         "Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id
                     )
-                except Exception as db_err:  # noqa: BLE001
+                except psycopg.Error as db_err:
                     logger.error("Не удалось сохранить статус ошибки для статьи [ID %d]: %s", news_id, db_err)
                 return False
 
