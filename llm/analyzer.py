@@ -8,6 +8,7 @@ from openai import (
     APIConnectionError,
     AsyncOpenAI,
     BadRequestError,
+    InternalServerError,
     LengthFinishReasonError,
     RateLimitError,
 )
@@ -44,7 +45,7 @@ class SentimentAnalyzer:
         self.extra_body = {"options": {"num_ctx": settings.llm_num_ctx}} if is_ollama else None
 
     @retry(
-        retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+        retry=retry_if_exception_type((RateLimitError, APIConnectionError, InternalServerError)),
         wait=wait_exponential(multiplier=1, min=2, max=20),
         stop=stop_after_attempt(settings.llm_max_retries),
         reraise=True,

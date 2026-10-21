@@ -22,11 +22,23 @@ services:
     depends_on:
       - db
 
-  remote-groq-llm:
+  # remote-groq-llm:
+  #   build: ./llm
+  #   restart: always
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     POSTGRES_HOST: db
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - db
+
+  local-mlx-llm:
     build: ./llm
     restart: always
     env_file:
-      - .env
+      - llm/.env.mlx.qwen
     environment:
       POSTGRES_HOST: db
     extra_hosts:
@@ -34,11 +46,11 @@ services:
     depends_on:
       - db
 
-  local-mlx-llm:
+  remote-gemini-llm:
     build: ./llm
     restart: always
     env_file:
-      - llm/.env.mlx.qwen
+      - llm/.env.gemini
     environment:
       POSTGRES_HOST: db
     extra_hosts:
