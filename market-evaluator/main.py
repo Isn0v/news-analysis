@@ -24,7 +24,7 @@ def setup_logging():
 
 
 async def async_main():
-    parser = argparse.ArgumentParser(description="Market Evaluator & Event Study CLI")
+    parser = argparse.ArgumentParser(description="Sentix Market Evaluator & Event Study CLI")
     parser.add_argument("--news-id", type=int, help="Оценить конкретную новость по ID")
     parser.add_argument("--batch", action="store_true", help="Оценить все доступные статьи пачкой")
     parser.add_argument("--limit", type=int, default=100, help="Лимит статей для пакетного режима")

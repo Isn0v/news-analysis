@@ -63,7 +63,7 @@ async def test_single_article(news_id: int):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LLM News Sentiment Service")
+    parser = argparse.ArgumentParser(description="Sentix LLM News Sentiment Service")
     parser.add_argument("--token", "--api-key", dest="api_key", type=str, help="API токен (Groq / OpenAI / Cloud API)")
     parser.add_argument("--model", type=str, help="Имя модели (например, llama-3.3-70b-versatile)")
     parser.add_argument("--base-url", type=str, help="URL эндпоинта (например, https://api.groq.com/openai/v1)")

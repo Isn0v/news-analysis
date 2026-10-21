@@ -1,6 +1,6 @@
-# 📈 `market-evaluator` (Market Reaction & Event Study Service)
+# 📈 Sentix Market Evaluator (`sentix-evaluator`) — Event Study Service
 
-Микросервис количественного анализа рыночной реакции криптовалют на опубликованные новости (Event Study Analysis) и валидации точности прогнозов LLM на биржевых данных Binance.
+Микросервис количественного анализа рыночной реакции котировок на опубликованные новости **Sentix** (Event Study Analysis) и валидации точности прогнозов LLM на биржевых данных Binance.
 
 ---
 

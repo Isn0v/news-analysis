@@ -1,6 +1,6 @@
-# 📥 `go-collector` (News Ingestion Microservice)
+# 📥 Sentix Collector (`sentix-collector`) — News Ingestion Microservice
 
-Высокопроизводительный асинхронный сервис сбора, нормализации и дедупликации криптовалютных новостей из 16 RSS/Atom каналов на языке Go.
+Высокопроизводительный асинхронный сервис сбора, нормализации и дедупликации новостей **Sentix** из 16 RSS/Atom каналов на языке Go.
 
 ---
 

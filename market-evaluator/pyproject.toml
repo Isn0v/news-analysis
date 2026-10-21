@@ -1,7 +1,7 @@
 [project]
-name = "market-evaluator"
+name = "sentix-evaluator"
 version = "0.1.0"
-description = "Event study and market impact evaluation service for crypto news"
+description = "Sentix: Event study and quantitative market impact validation engine"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

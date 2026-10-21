@@ -1,6 +1,6 @@
-# 🧠 `llm` (Financial Sentiment Analysis Service)
+# 🧠 Sentix LLM (`sentix-llm`) — Financial Sentiment Analysis Service
 
-Микросервис квантитативного финансового NLP-анализа новостей криптовалютного рынка на базе современных LLM с гарантированным извлечением строго типизированных данных (Pydantic / OpenAI Structured Outputs).
+Микросервис квантитативного финансового NLP-анализа новостей **Sentix** на базе современных LLM с гарантированным извлечением строго типизированных данных (Pydantic / OpenAI Structured Outputs).
 
 ---
 
