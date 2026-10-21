@@ -106,7 +106,7 @@ class SentimentAnalyzer:
             parse_kwargs = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": SYSTEM_PROMPT + FALLBACK_JSON_INSTRUCTION},
                     {"role": "user", "content": user_prompt},
                 ],
                 "response_format": SentimentAnalysisResult,
