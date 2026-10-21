@@ -93,7 +93,7 @@ def run_migrations():
                 with conn.transaction():
                     cur.execute(sql_content)
                     cur.execute(
-                        "INSERT INTO schema_migrations (version) VALUES (%s);",
+                        "INSERT INTO schema_migrations (version) VALUES (%s) ON CONFLICT (version) DO NOTHING;",
                         (version,),
                     )
 

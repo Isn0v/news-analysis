@@ -2,6 +2,11 @@
 -- Миграция 001: Базовая схема таблиц raw_news и news_market_impact
 -- ====================================================================
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     VARCHAR(255) PRIMARY KEY,
+    applied_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS raw_news (
     id                  SERIAL PRIMARY KEY,
 
@@ -33,7 +38,7 @@ CREATE TABLE IF NOT EXISTS raw_news (
 
     -- Поля для Market Evaluator пайплайна
     market_evaluated    BOOLEAN DEFAULT FALSE,
-    market_evaluated_at TIMESTAMP,
+    market_evaluated_at TIMESTAMPTZ,
 
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -83,3 +88,5 @@ CREATE TABLE IF NOT EXISTS news_market_impact (
 CREATE INDEX IF NOT EXISTS idx_market_impact_news_id ON news_market_impact(news_id);
 CREATE INDEX IF NOT EXISTS idx_market_impact_ticker ON news_market_impact(ticker);
 CREATE INDEX IF NOT EXISTS idx_market_impact_t0 ON news_market_impact(t0_timestamp DESC);
+
+INSERT INTO schema_migrations (version) VALUES ('001_initial_schema.sql') ON CONFLICT (version) DO NOTHING;

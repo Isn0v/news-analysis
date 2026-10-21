@@ -2,6 +2,11 @@
 -- Миграция 002: Поля и индексы распределенной очереди для параллельных LLM-воркеров
 -- ====================================================================
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     VARCHAR(255) PRIMARY KEY,
+    applied_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Поля блокировки задачи за конкретным воркером
 ALTER TABLE raw_news ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
 ALTER TABLE raw_news ADD COLUMN IF NOT EXISTS locked_by VARCHAR(100);
@@ -10,3 +15,5 @@ ALTER TABLE raw_news ADD COLUMN IF NOT EXISTS locked_by VARCHAR(100);
 CREATE INDEX IF NOT EXISTS idx_raw_news_queue
     ON raw_news (timestamp_utc ASC)
     WHERE processed = FALSE;
+
+INSERT INTO schema_migrations (version) VALUES ('002_add_distributed_queue_locks.sql') ON CONFLICT (version) DO NOTHING;
