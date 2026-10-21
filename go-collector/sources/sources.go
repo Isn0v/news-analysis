@@ -17,7 +17,7 @@ var Active = []model.Source{
 	{Name: "dailyhodl",        URL: "https://dailyhodl.com/feed/"},           // Авторитетный агрегатор новостей (~5 300 chars)
 	{Name: "blockonomi",       URL: "https://blockonomi.com/feed/"},          // Аналитика рынка с TLDR (~7 400 chars)
 	{Name: "finbold",          URL: "https://finbold.com/feed/"},             // Финансы, макроэкономика и регуляторика (~5 000 chars)
-	{Name: "coinspeaker",      URL: "https://coinspeaker.com/feed/"},         // Новости финтеха и Web3 (~7 900 chars)
+	{Name: "coinspeaker",      URL: "https://www.coinspeaker.com/news/feed/"}, // Новости финтеха и Web3 (~7 900 chars)
 
 	// Эшелон 3: Устоявшиеся новостные порталы и теханализ
 	{Name: "bitcoinist",       URL: "https://bitcoinist.com/feed/"},          // Новости и ончейн (~5 800 chars)

@@ -1,6 +1,7 @@
+**/.env*
+!**/.env.example
 **/agy-conv*
 postgres
-**/.env
 .vscode
 
 go-collector/vendor

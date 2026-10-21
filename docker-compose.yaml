@@ -22,14 +22,25 @@ services:
     depends_on:
       - db
 
-  llm:
+  remote-groq-llm:
     build: ./llm
     restart: always
     env_file:
       - .env
     environment:
       POSTGRES_HOST: db
-      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-${LLM_BASE_URL:-http://host.docker.internal:11434/v1}}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+
+  local-mlx-llm:
+    build: ./llm
+    restart: always
+    env_file:
+      - llm/.env.mlx.qwen
+    environment:
+      POSTGRES_HOST: db
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

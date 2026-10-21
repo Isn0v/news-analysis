@@ -126,6 +126,24 @@ class SentimentAnalyzer:
                 return parsed_result
 
         except (LengthFinishReasonError, ValidationError, BadRequestError) as parse_err:
+            # Оптимизация для локальных моделей (Qwen / DeepSeek): если модель вернула валидный
+            # JSON, но обернула его в markdown ```json, восстанавливаем результат напрямую без
+            # долгого повторного запроса к LLM.
+            raw_content = None
+            if isinstance(parse_err, ValidationError):
+                errors = parse_err.errors()
+                if errors and "input" in errors[0]:
+                    raw_content = str(errors[0]["input"])
+            elif isinstance(parse_err, LengthFinishReasonError) and hasattr(parse_err, "completion"):
+                raw_content = parse_err.completion.choices[0].message.content
+
+            if raw_content:
+                try:
+                    clean_json = self._extract_json_from_text(raw_content)
+                    return SentimentAnalysisResult.model_validate_json(clean_json)
+                except (ValidationError, ValueError):
+                    pass
+
             logger.warning(
                 "Метод .parse() вернул ошибку (%s). Применяем fallback с очисткой и JSON-парсингом...",
                 parse_err,

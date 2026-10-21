@@ -14,8 +14,10 @@ from db import DatabaseManager
 async def _get_connected_db():
     db = DatabaseManager()
     try:
+        await db.initialize()
         async with asyncio.timeout(2.0):
-            await db.initialize()
+            async with db.pool.connection() as conn, conn.cursor() as cur:
+                await cur.execute("SELECT 1;")
         return db
     except (psycopg.Error, TimeoutError, OSError) as e:
         if db.pool:

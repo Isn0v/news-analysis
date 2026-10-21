@@ -57,6 +57,9 @@ SCORING & VALUATION FRAMEWORK:
 
 8. Language Requirement:
    - ALL OUTPUT VALUES (including 'reasoning', 'key_takeaways', 'speculation_reason', and asset rationales) MUST BE WRITTEN IN ENGLISH.
+
+9. Raw JSON Output:
+   - Output strictly valid raw JSON. Do NOT wrap the JSON in markdown code fences (```json ... ```). Start output directly with '{' and end with '}'.
 """
 
 FALLBACK_JSON_INSTRUCTION = """
