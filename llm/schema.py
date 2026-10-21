@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SentimentLabel(str, Enum):
@@ -113,3 +113,23 @@ class SentimentAnalysisResult(BaseModel):
     reasoning: str = Field(
         description="Rigorous Chain-of-Thought economic rationale in English explaining the transmission mechanism to supply, demand, and liquidity"
     )
+
+    @model_validator(mode="after")
+    def align_sentiment_sign_and_label(self) -> "SentimentAnalysisResult":
+        """Enforces mathematical sign and label consistency between sentiment_score and sentiment_label."""
+        if self.sentiment_label == SentimentLabel.BEARISH:
+            if self.sentiment_score > 0:
+                self.sentiment_score = -abs(self.sentiment_score)
+            elif self.sentiment_score == 0.0:
+                self.sentiment_score = -0.15
+        elif self.sentiment_label == SentimentLabel.BULLISH:
+            if self.sentiment_score < 0:
+                self.sentiment_score = abs(self.sentiment_score)
+            elif self.sentiment_score == 0.0:
+                self.sentiment_score = 0.15
+        elif self.sentiment_label == SentimentLabel.NEUTRAL:
+            if self.sentiment_score >= 0.10:
+                self.sentiment_label = SentimentLabel.BULLISH
+            elif self.sentiment_score <= -0.10:
+                self.sentiment_label = SentimentLabel.BEARISH
+        return self

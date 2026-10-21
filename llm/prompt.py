@@ -1,5 +1,8 @@
 """System and user prompt definitions for institutional cryptocurrency sentiment analysis."""
 
+import html
+import re
+
 from config import settings
 
 SYSTEM_PROMPT = """You are a Senior Quantitative Crypto Research Analyst and Financial NLP Specialist at a top digital assets quantitative hedge fund.
@@ -9,7 +12,7 @@ SCORING & VALUATION FRAMEWORK:
 1. Directional Sentiment Score (sentiment_score between -1.0 and +1.0):
    - [+0.60 to +1.00] Strong Bullish Catalyst: Spot ETF approval/inflows, Fed rate cut / QE, sovereign adoption, major protocol breakthrough.
    - [+0.10 to +0.55] Moderate Bullish: Major exchange listing, successful mainnet upgrade, constructive institutional partnership, positive on-chain metric surge.
-   - [-0.09 to +0.09] Neutral: Symmetric macro forces, purely routine administrative updates, or non-impactful educational content.
+   - [-0.09 to +0.09] Neutral: Symmetric macro forces, purely routine administrative updates, localized fiat bank scams/fraud, or non-crypto IT/forex news.
    - [-0.10 to -0.55] Moderate Bearish: Regulatory subpoena/investigation, institutional fund outflows, protocol bug/delay, rising inflation print.
    - [-0.60 to -1.00] Severe Bearish Shock: Large-scale exploit/hack (>$20M), stablecoin de-pegging, exchange insolvency, regulatory ban, hawkish rate shock.
 
@@ -18,13 +21,20 @@ SCORING & VALUATION FRAMEWORK:
    - 'bearish': sentiment_score <= -0.10
    - 'neutral': -0.10 < sentiment_score < +0.10
 
-3. Anti-Neutral Calibration Rule:
-   - DO NOT default to 0.0 or 'neutral' if the news conveys an identifiable catalyst for supply or demand changes.
+3. Anti-Neutral Calibration Rule & Non-Crypto Noise Filter:
+   - DO NOT default to 0.0 or 'neutral' if the news conveys an identifiable catalyst for crypto supply or demand changes.
    - If an event is mildly directional, use [+0.15 to +0.35] or [-0.15 to -0.35].
-   - Reserve 0.0 only for genuinely balanced or non-actionable reports.
+   - Non-Crypto / Irrelevant Content Rule: If the news describes localized fiat banking fraud, wire scams, traditional retail bank impersonations (e.g. Bank of America phishing), identity theft, generic non-crypto IT/forex conferences without crypto asset market transmission, you MUST assign:
+     * sentiment_score: 0.0
+     * sentiment_label: "neutral"
+     * impact_magnitude: 1
+     * transmission_channel: "none"
+     * affected_assets: []
+     * is_speculative: true
+     * speculation_reason: "Non-crypto event or localized fiat scam with zero crypto market transmission."
 
 4. Impact Magnitude (1 to 10):
-   - 1-3: Low impact / local noise (minor patch, individual analyst opinion, niche token update).
+   - 1-3: Low impact / local noise (minor patch, individual analyst opinion, niche token update, non-crypto noise).
    - 4-6: Sector impact (DeFi, L1 ecosystem, top 20 altcoin developments).
    - 7-10: Systemic shock affecting total crypto market liquidity (Fed decisions, CPI prints, SEC enforcement, Binance/Tether events).
 
@@ -34,6 +44,7 @@ SCORING & VALUATION FRAMEWORK:
      * Technical chart pattern analysis ("Head and shoulders suggests drop", "Golden cross confirmed").
      * Unconfirmed rumors, anonymous leaks, speculative social media sentiment.
      * Personal essays, op-eds, and philosophical commentary.
+     * Irrelevant non-crypto news, local fiat banking scams, identity theft.
    - is_speculative = False (HARD FACT / SYSTEMIC CATALYST):
      * Official macroeconomic data releases (FOMC rate decisions, CPI prints, jobs data).
      * Official regulatory and legal actions (SEC rulings, court decisions, legislative bills).
@@ -48,11 +59,12 @@ SCORING & VALUATION FRAMEWORK:
    - regulatory: SEC/CFTC actions, MiCA compliance, legal judgments, bans.
    - defi_tech_exploit: Smart contract hacks, bridge drainage, protocol economic exploits.
    - general_crypto: Native ecosystem events, listings, network upgrades, tokenomics changes.
-   - none: No identifiable transmission channel.
+   - none: No identifiable transmission channel (mandatory for localized fiat scams, traditional bank fraud, or non-crypto events).
 
 7. Asset Differentiation (affected_assets):
    - List standard uppercase tickers (e.g. 'BTC', 'ETH', 'SOL', 'XRP').
    - For broad market or macroeconomic news, default to ['BTC'].
+   - For non-crypto news or noise, leave empty: [].
    - For each asset, specify individual sentiment and English rationale.
 
 8. Language Requirement:
@@ -94,9 +106,18 @@ def build_analysis_user_prompt(
     content: str,
     max_chars: int | None = None,
 ) -> str:
-    """Builds a structured user prompt for news analysis with length truncation."""
+    """Builds a structured user prompt for news analysis with HTML cleanup and length truncation."""
     limit = max_chars if max_chars is not None else settings.max_content_chars
-    cleaned_content = content[:limit].strip()
+
+    # 1. HTML entities unescape (&rsquo; -> ', &amp; -> &, &nbsp; -> ' ')
+    unescaped = html.unescape(content)
+    # 2. Strip HTML tags (<p>, <a>, <div>, etc.)
+    stripped = re.sub(r"<[^>]+>", " ", unescaped)
+    # 3. Collapse multiple whitespaces and tabs
+    clean_text = re.sub(r"\s+", " ", stripped).strip()
+    # 4. Truncate to maximum characters
+    cleaned_content = clean_text[:limit].strip()
+
     categories_str = ", ".join(categories) if categories else "None specified"
 
     return f"""Analyze the following cryptocurrency news item and provide a structured quantitative evaluation:

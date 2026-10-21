@@ -83,7 +83,7 @@ def test_extract_json_from_markdown_codeblock():
 
 def test_extract_json_raw_braces():
     """Проверка извлечения JSON с окружающим сопроводительным текстом без codeblock."""
-    raw_llm_output = 'Результат: {"sentiment_score": 0.1, "sentiment_label": "neutral", "confidence": 0.6, "impact_magnitude": 2, "time_horizon": "immediate_1h_4h", "information_type": "opinion_analysis", "market_surprise": "not_applicable", "transmission_channel": "none", "reasoning": "нейтрально"} - конец ответа.'
+    raw_llm_output = 'Результат: {"sentiment_score": 0.05, "sentiment_label": "neutral", "confidence": 0.6, "impact_magnitude": 2, "time_horizon": "immediate_1h_4h", "information_type": "opinion_analysis", "market_surprise": "not_applicable", "transmission_channel": "none", "reasoning": "нейтрально"} - конец ответа.'
     clean_json = SentimentAnalyzer._extract_json_from_text(raw_llm_output)
     assert clean_json.startswith("{")
     assert clean_json.endswith("}")

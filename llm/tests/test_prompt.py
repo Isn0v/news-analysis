@@ -43,3 +43,24 @@ def test_build_analysis_user_prompt_content_truncation():
 
     assert "A" * 200 in prompt
     assert "A" * 201 not in prompt
+
+
+def test_build_analysis_user_prompt_html_cleaning():
+    """Verify HTML tag stripping and entity unescaping in prompt builder."""
+    dirty_html = (
+        "<p>Bitcoin&#39;s surge &amp; Ethereum&#8217;s breakout!</p>"
+        "<div class='ad'><a href='https://example.com'>Click here</a></div>"
+        "   Line with   lots   of   spaces.   "
+    )
+    prompt = build_analysis_user_prompt(
+        title="Surge News",
+        source="CoinTelegraph",
+        categories=["Market"],
+        content=dirty_html,
+    )
+
+    assert "Bitcoin's surge & Ethereum’s breakout! Click here Line with lots of spaces." in prompt
+    assert "<p>" not in prompt
+    assert "<div" not in prompt
+    assert "&#39;" not in prompt
+    assert "&amp;" not in prompt

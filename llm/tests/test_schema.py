@@ -104,3 +104,65 @@ def test_speculative_defaults():
     assert result.speculation_reason == ""
     assert result.detected_currencies == []
     assert result.detected_categories == []
+
+
+def test_align_sentiment_sign_and_label():
+    """Проверка автоматической синхронизации знака sentiment_score и sentiment_label."""
+    base_data = {
+        "confidence": 0.8,
+        "impact_magnitude": 5,
+        "time_horizon": "immediate_1h_4h",
+        "information_type": "hard_fact",
+        "market_surprise": "in_line",
+        "transmission_channel": "general_crypto",
+        "reasoning": "Тест синхронизации сентимента",
+    }
+
+    # 1. Bearish с положительным score -> score инвертируется в отрицательный
+    res_bearish = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "bearish", "sentiment_score": 0.25}
+    )
+    assert res_bearish.sentiment_score == -0.25
+    assert res_bearish.sentiment_label == SentimentLabel.BEARISH
+
+    # 2. Bullish с отрицательным score -> score инвертируется в положительный
+    res_bullish = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "bullish", "sentiment_score": -0.35}
+    )
+    assert res_bullish.sentiment_score == 0.35
+    assert res_bullish.sentiment_label == SentimentLabel.BULLISH
+
+    # 3. Bearish с нулевым score -> становится -0.15
+    res_bearish_zero = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "bearish", "sentiment_score": 0.0}
+    )
+    assert res_bearish_zero.sentiment_score == -0.15
+    assert res_bearish_zero.sentiment_label == SentimentLabel.BEARISH
+
+    # 4. Bullish с нулевым score -> становится 0.15
+    res_bullish_zero = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "bullish", "sentiment_score": 0.0}
+    )
+    assert res_bullish_zero.sentiment_score == 0.15
+    assert res_bullish_zero.sentiment_label == SentimentLabel.BULLISH
+
+    # 5. Neutral со значимым положительным score (>= 0.10) -> label становится bullish
+    res_neutral_pos = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "neutral", "sentiment_score": 0.40}
+    )
+    assert res_neutral_pos.sentiment_score == 0.40
+    assert res_neutral_pos.sentiment_label == SentimentLabel.BULLISH
+
+    # 6. Neutral со значимым отрицательным score (<= -0.10) -> label становится bearish
+    res_neutral_neg = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "neutral", "sentiment_score": -0.40}
+    )
+    assert res_neutral_neg.sentiment_score == -0.40
+    assert res_neutral_neg.sentiment_label == SentimentLabel.BEARISH
+
+    # 7. Истинный Neutral (-0.10 < score < 0.10) -> остается neutral
+    res_neutral_ok = SentimentAnalysisResult.model_validate(
+        {**base_data, "sentiment_label": "neutral", "sentiment_score": 0.05}
+    )
+    assert res_neutral_ok.sentiment_score == 0.05
+    assert res_neutral_ok.sentiment_label == SentimentLabel.NEUTRAL
