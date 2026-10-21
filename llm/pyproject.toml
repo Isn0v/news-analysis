@@ -3,6 +3,7 @@ name = "sentix-llm"
 version = "0.1.0"
 description = "Sentix: Quantitative financial sentiment analysis and event reasoning"
 readme = "README.md"
+license = { text = "Proprietary" }
 requires-python = ">=3.9"
 dependencies = [
     "httpx>=0.28.1",

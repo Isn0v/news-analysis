@@ -1,0 +1,60 @@
+PROPRIETARY AND COMMERCIAL SOFTWARE LICENSE
+
+Copyright (C) 2026 Isn0v. All Rights Reserved.
+
+Sentix — Quantitative Financial NLP & Market Event Study Engine.
+
+==============================================================================
+1. PROPRIETARY RIGHTS & GRANT OF RESTRICTIONS
+==============================================================================
+
+This software and its associated documentation, source code, database schemas,
+architectural designs, machine learning prompts, mathematical models, and algorithms
+(collectively, the "Software") are the sole and exclusive proprietary property and
+trade secrets of the Copyright Holder (Isn0v).
+
+All rights, title, and interest in and to the Software, including all associated
+intellectual property rights, remain exclusively with the Copyright Holder.
+
+STRICTLY PROHIBITED WITHOUT PRIOR WRITTEN CONSENT FROM THE COPYRIGHT HOLDER:
+- Copying, cloning, reproducing, or redistributing the Software in whole or in part;
+- Selling, renting, leasing, sublicensing, or commercially monetizing the Software;
+- Deploying the Software as a public or private Software-as-a-Service (SaaS), API,
+  or cloud platform for third-party access;
+- Modifying, merging, reverse engineering, decompiling, or creating derivative works
+  based upon the Software.
+
+==============================================================================
+2. FINANCIAL & INVESTMENT ADVICE DISCLAIMER (NO FINANCIAL ADVICE)
+==============================================================================
+
+THE SOFTWARE IS DESIGNED STRICTLY FOR QUANTITATIVE RESEARCH, STATISTICAL MODELING,
+AND INFORMATION PROCESSING PURPOSES.
+
+- NO INVESTMENT RECOMMENDATION: Nothing produced by the Software, including sentiment
+  scores, directional indicators, impact magnitudes, Event Study metrics, or automated
+  signals, constitutes financial, investment, trading, accounting, or legal advice.
+  The Software does NOT provide individual investment recommendations
+  (не является индивидуальной инвестиционной рекомендацией).
+
+- ASSUMPTION OF RISK: Trading cryptocurrencies, equities, derivatives, futures, and
+  financial instruments carries substantial risk of loss, up to and including the total
+  loss of capital. Any financial decision, trade execution, or algorithmic order
+  placed using data or signals from this Software is made at the user's sole discretion
+  and risk.
+
+- LIMITATION OF LIABILITY: In no event shall the Copyright Holder or contributors be
+  liable for any direct, indirect, incidental, special, exemplary, punitive, or
+  consequential damages (including, but not limited to, loss of capital, trading losses,
+  liquidation costs, loss of profits, slippage, system downtime, or data corruption),
+  regardless of the legal theory (contract, strict liability, or tort, including
+  negligence), arising in any way out of the use of this Software.
+
+==============================================================================
+3. "AS IS" WARRANTY DISCLAIMER
+==============================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, ACCURACY, TITLE, AND NON-INFRINGEMENT. THE COPYRIGHT HOLDER
+DOES NOT WARRANT THAT THE SOFTWARE WILL BE UNINTERRUPTED, SECURE, ACCURATE, OR ERROR-FREE.
