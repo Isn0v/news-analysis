@@ -38,7 +38,7 @@ services:
     build: ./llm
     restart: always
     env_file:
-      - llm/.env.mlx.qwen
+      - llm/.env.mlx.deepseek
     environment:
       POSTGRES_HOST: db
     extra_hosts:

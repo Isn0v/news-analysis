@@ -39,6 +39,10 @@ qwen-ollama-setup:
 mlx-serve:
 	./scripts/run_mlx_qwen.sh
 
+## mlx-deepseek: запустить локальный MLX-сервер DeepSeek-R1 14B на Apple Silicon (порт 8080)
+mlx-deepseek:
+	./scripts/run_mlx_deepseek.sh
+
 ## llm-reset: сбросить статус обработки новостей и подготовить к повторному инференсу
 llm-reset:
 	docker compose exec -T db psql -U trader -d crypto_news -c "UPDATE raw_news SET processed = FALSE, processed_at = NULL, llm_result = NULL; TRUNCATE TABLE news_market_impact;"
