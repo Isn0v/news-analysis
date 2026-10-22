@@ -27,6 +27,11 @@ import psycopg
 # Load settings from market-evaluator config (reads ../.env)
 from config import settings
 from psycopg.rows import dict_row
+from queries import (
+    EXPORT_COMBINED_QUERY,
+    EXPORT_MARKET_IMPACT_QUERY,
+    EXPORT_RAW_NEWS_QUERY,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,131 +76,9 @@ def _write_json(path: Path, rows: list[dict]) -> None:
 # Queries
 # ---------------------------------------------------------------------------
 
-QUERY_RAW_NEWS = """
-SELECT
-    n.id,
-    n.url,
-    n.source,
-    n.origin_source,
-    n.title,
-    n.authors,
-    n.categories,
-    n.timestamp_utc,
-    n.processed,
-    n.processed_at,
-    n.llm_model,
-    n.market_evaluated,
-    n.market_evaluated_at,
-    -- Flattened top-level LLM fields
-    (n.llm_result->>'sentiment_score')::numeric         AS sentiment_score,
-    n.llm_result->>'sentiment_label'                    AS sentiment_label,
-    (n.llm_result->>'confidence')::numeric              AS confidence,
-    (n.llm_result->>'impact_magnitude')::int            AS impact_magnitude,
-    n.llm_result->>'transmission_channel'               AS transmission_channel,
-    n.llm_result->>'information_type'                   AS information_type,
-    n.llm_result->>'time_horizon'                       AS time_horizon,
-    n.llm_result->>'market_surprise'                    AS market_surprise,
-    (n.llm_result->>'target_horizon_hours')::int        AS target_horizon_hours,
-    (n.llm_result->>'is_mean_reverting')::boolean       AS is_mean_reverting,
-    (n.llm_result->>'is_speculative')::boolean          AS is_speculative,
-    n.llm_result->>'speculation_reason'                 AS speculation_reason,
-    n.llm_result->>'reasoning'                          AS reasoning,
-    n.llm_result->'detected_currencies'                 AS detected_currencies,
-    n.llm_result->'detected_categories'                 AS detected_categories,
-    n.llm_result->'affected_assets'                     AS affected_assets,
-    n.llm_result->'key_takeaways'                       AS key_takeaways,
-    -- Raw LLM error flag (for failed articles)
-    CASE WHEN n.llm_result ? 'error' THEN TRUE ELSE FALSE END AS llm_error,
-    n.llm_result->>'error'                              AS llm_error_message
-FROM raw_news n
-ORDER BY n.timestamp_utc ASC;
-"""
-
-QUERY_MARKET_IMPACT = """
-SELECT
-    m.id             AS impact_id,
-    m.news_id,
-    COALESCE(m.llm_model, n.llm_model) AS llm_model,
-    n.source,
-    n.title,
-    n.timestamp_utc  AS news_published_at,
-    m.ticker,
-    m.symbol,
-    m.t0_timestamp,
-    m.p0_price,
-    m.pre_drift_pct,
-    m.volume_surge_ratio,
-    m.return_15m_pct,
-    m.return_1h_pct,
-    m.return_2h_pct,
-    m.return_4h_pct,
-    m.return_8h_pct,
-    m.return_24h_pct,
-    m.max_runup_pct,
-    m.max_drawdown_pct,
-    m.volatility_range_pct,
-    m.sentiment_label,
-    m.sentiment_score,
-    m.impact_magnitude,
-    m.target_horizon_hours,
-    m.is_mean_reverting_expected,
-    m.is_speculative,
-    m.is_impulse_confirmed,
-    m.is_target_horizon_aligned,
-    m.is_aligned_15m,
-    m.is_aligned_1h,
-    m.is_aligned_4h,
-    m.is_aligned_24h,
-    m.evaluated_at
-FROM news_market_impact m
-JOIN raw_news n ON n.id = m.news_id
-ORDER BY m.t0_timestamp ASC;
-"""
-
-QUERY_COMBINED = """
-SELECT
-    n.id             AS news_id,
-    n.url,
-    n.source,
-    n.title,
-    n.timestamp_utc  AS news_published_at,
-    COALESCE(m.llm_model, n.llm_model) AS llm_model,
-    -- LLM
-    (n.llm_result->>'sentiment_score')::numeric         AS sentiment_score,
-    n.llm_result->>'sentiment_label'                    AS sentiment_label,
-    (n.llm_result->>'confidence')::numeric              AS confidence,
-    (n.llm_result->>'impact_magnitude')::int            AS impact_magnitude,
-    n.llm_result->>'transmission_channel'               AS transmission_channel,
-    n.llm_result->>'information_type'                   AS information_type,
-    (n.llm_result->>'target_horizon_hours')::int        AS target_horizon_hours,
-    (n.llm_result->>'is_mean_reverting')::boolean       AS is_mean_reverting,
-    (n.llm_result->>'is_speculative')::boolean          AS is_speculative,
-    n.llm_result->>'speculation_reason'                 AS speculation_reason,
-    n.llm_result->>'reasoning'                          AS reasoning,
-    -- Market
-    m.ticker,
-    m.symbol,
-    m.t0_timestamp,
-    m.p0_price,
-    m.pre_drift_pct,
-    m.volume_surge_ratio,
-    m.return_15m_pct,
-    m.return_1h_pct,
-    m.return_4h_pct,
-    m.return_24h_pct,
-    m.max_runup_pct,
-    m.max_drawdown_pct,
-    m.volatility_range_pct,
-    m.is_impulse_confirmed,
-    m.is_target_horizon_aligned,
-    m.is_aligned_1h,
-    m.is_aligned_4h,
-    m.is_aligned_24h,
-    m.evaluated_at
-FROM raw_news n
-JOIN news_market_impact m ON m.news_id = n.id
-ORDER BY n.timestamp_utc ASC, m.ticker ASC;
-"""
+QUERY_RAW_NEWS = EXPORT_RAW_NEWS_QUERY
+QUERY_MARKET_IMPACT = EXPORT_MARKET_IMPACT_QUERY
+QUERY_COMBINED = EXPORT_COMBINED_QUERY
 
 
 # ---------------------------------------------------------------------------

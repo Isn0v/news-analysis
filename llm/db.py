@@ -9,6 +9,7 @@ from config import settings
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from queries import (
+    FETCH_NEWS_BY_ID_QUERY,
     FETCH_UNPROCESSED_BATCH_QUERY,
     GET_TABLE_STATS_QUERY,
     RELEASE_ARTICLE_LOCK_QUERY,
@@ -47,6 +48,12 @@ class DatabaseManager:
         if self.pool:
             await self.pool.close()
             logger.info("Пул соединений PostgreSQL закрыт.")
+
+    async def fetch_article_by_id(self, news_id: int) -> dict[str, Any] | None:
+        """Извлекает одну новость по её ID для единичного анализа/тестирования."""
+        async with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(FETCH_NEWS_BY_ID_QUERY, (news_id,))
+            return await cur.fetchone()
 
     async def fetch_unprocessed_batch(
         self,

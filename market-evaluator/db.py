@@ -8,8 +8,13 @@ from config import settings
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from queries import (
+    FETCH_NEWS_BY_ID_QUERY,
     FETCH_UNEVALUATED_NEWS_QUERY,
     GET_EVALUATION_STATS_QUERY,
+    GET_MODEL_STATS_QUERY,
+    MARK_NEWS_EVALUATED_QUERY,
+    RECALCULATE_FETCH_ALL_QUERY,
+    RECALCULATE_UPDATE_IMPACT_QUERY,
     SAVE_MARKET_IMPACT_QUERY,
 )
 
@@ -55,13 +60,8 @@ class DatabaseManager:
 
     async def fetch_news_by_id(self, news_id: int) -> dict[str, Any] | None:
         """Извлекает конкретную новость по ее ID."""
-        query = """
-        SELECT id AS news_id, source, title, timestamp_utc, llm_result
-        FROM raw_news
-        WHERE id = %s;
-        """
         async with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(query, (news_id,))
+            await cur.execute(FETCH_NEWS_BY_ID_QUERY, (news_id,))
             return await cur.fetchone()
 
     async def save_market_impact(self, news_id: int, metrics: EventStudyMetrics):
@@ -105,14 +105,8 @@ class DatabaseManager:
 
     async def mark_news_evaluated(self, news_id: int):
         """Помечает новость как оцененную (или проверенную) в raw_news."""
-        query = """
-        UPDATE raw_news
-        SET market_evaluated = TRUE,
-            market_evaluated_at = NOW()
-        WHERE id = %s;
-        """
         async with self.pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(query, (news_id,))
+            await cur.execute(MARK_NEWS_EVALUATED_QUERY, (news_id,))
             await conn.commit()
 
     async def get_stats(self) -> dict[str, Any]:
@@ -123,70 +117,15 @@ class DatabaseManager:
 
     async def get_model_stats(self) -> list[dict[str, Any]]:
         """Возвращает сравнительную статистику точности по каждой LLM-модели."""
-        query = """
-        SELECT
-            COALESCE(llm_model, 'unknown') AS model,
-            COUNT(*) AS total_evals,
-            COUNT(*) FILTER (WHERE is_speculative = FALSE) AS factual_evals,
-            ROUND(AVG(volume_surge_ratio), 2) AS avg_vol_surge,
-            ROUND(
-                COUNT(*) FILTER (WHERE is_impulse_confirmed = TRUE AND is_speculative = FALSE AND (sentiment_label IN ('bullish', 'bearish') OR ABS(sentiment_score) >= 0.15))::numeric * 100.0 /
-                NULLIF(COUNT(*) FILTER (WHERE is_speculative = FALSE AND (sentiment_label IN ('bullish', 'bearish') OR ABS(sentiment_score) >= 0.15)), 0),
-                1
-            ) AS factual_impulse_pct,
-            ROUND(
-                COUNT(*) FILTER (WHERE is_aligned_4h = TRUE AND is_speculative = FALSE)::numeric * 100.0 /
-                NULLIF(COUNT(*) FILTER (WHERE is_speculative = FALSE AND is_aligned_4h IS NOT NULL AND (sentiment_label IN ('bullish', 'bearish') OR ABS(sentiment_score) >= 0.15)), 0),
-                1
-            ) AS factual_dir_4h_pct,
-            ROUND(
-                COUNT(*) FILTER (WHERE is_speculative = TRUE AND metrics_detail->>'trajectory' = 'FADED')::numeric * 100.0 /
-                NULLIF(COUNT(*) FILTER (WHERE is_speculative = TRUE AND is_impulse_confirmed = TRUE AND (sentiment_label IN ('bullish', 'bearish') OR ABS(sentiment_score) >= 0.15)), 0),
-                1
-            ) AS fade_rate_pct
-        FROM news_market_impact
-        GROUP BY COALESCE(llm_model, 'unknown')
-        ORDER BY total_evals DESC;
-        """
         async with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(query)
+            await cur.execute(GET_MODEL_STATS_QUERY)
             return await cur.fetchall()
 
     async def recalculate_all_impacts(self, thresh: float) -> int:
         """Пересчитывает подтверждение импульса, направленность и траектории для всех записей по порогу thresh."""
-        fetch_query = """
-        SELECT
-            id,
-            sentiment_label,
-            sentiment_score,
-            return_15m_pct,
-            return_1h_pct,
-            return_2h_pct,
-            return_4h_pct,
-            return_8h_pct,
-            return_24h_pct,
-            target_horizon_hours,
-            is_mean_reverting_expected,
-            is_speculative,
-            metrics_detail
-        FROM news_market_impact;
-        """
-        update_query = """
-        UPDATE news_market_impact
-        SET
-            is_impulse_confirmed = %s,
-            is_aligned_15m = %s,
-            is_aligned_1h = %s,
-            is_aligned_4h = %s,
-            is_aligned_24h = %s,
-            is_target_horizon_aligned = %s,
-            metrics_detail = %s
-        WHERE id = %s;
-        """
-
         async with self.pool.connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
-                await cur.execute(fetch_query)
+                await cur.execute(RECALCULATE_FETCH_ALL_QUERY)
                 rows = await cur.fetchall()
 
             updates = []
@@ -264,7 +203,12 @@ class DatabaseManager:
                         trajectory = "CONTINUATION"
                     elif target_ret is not None and initial_runup > 0:
                         retrace_pct = max(0.0, min(100.0, ((initial_runup - target_ret) / initial_runup) * 100.0))
-                        trajectory = "FADED" if retrace_pct >= 50.0 or target_ret <= (thresh * 0.5) else "CONTINUATION"
+                        trajectory = (
+                            "FADED"
+                            if retrace_pct >= settings.retrace_fade_threshold_pct
+                            or target_ret <= (thresh * settings.continuation_min_thresh_factor)
+                            else "CONTINUATION"
+                        )
                     else:
                         trajectory = "FADED"
                 elif is_impulse_confirmed and is_bearish:
@@ -275,7 +219,12 @@ class DatabaseManager:
                             0.0,
                             min(100.0, ((abs(initial_drawdown) - abs(target_ret)) / abs(initial_drawdown)) * 100.0),
                         )
-                        trajectory = "FADED" if retrace_pct >= 50.0 or target_ret >= (-thresh * 0.5) else "CONTINUATION"
+                        trajectory = (
+                            "FADED"
+                            if retrace_pct >= settings.retrace_fade_threshold_pct
+                            or target_ret >= (-thresh * settings.continuation_min_thresh_factor)
+                            else "CONTINUATION"
+                        )
                     else:
                         trajectory = "FADED"
                 elif (
@@ -290,7 +239,8 @@ class DatabaseManager:
                     is_target_horizon_aligned = None
                 elif is_mean_reverting:
                     is_target_horizon_aligned = is_impulse_confirmed and (
-                        trajectory == "FADED" or (abs(target_ret) <= thresh * 1.5)
+                        trajectory == "FADED"
+                        or (abs(target_ret) <= thresh * settings.mean_reverting_band_factor)
                     )
                 else:
                     is_target_horizon_aligned = check_alignment(target_ret, is_bullish, is_bearish)
@@ -312,7 +262,7 @@ class DatabaseManager:
                 )
 
             async with conn.cursor() as cur:
-                await cur.executemany(update_query, updates)
+                await cur.executemany(RECALCULATE_UPDATE_IMPACT_QUERY, updates)
             await conn.commit()
 
             return len(updates)

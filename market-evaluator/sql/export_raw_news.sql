@@ -1,0 +1,37 @@
+SELECT
+    n.id,
+    n.url,
+    n.source,
+    n.origin_source,
+    n.title,
+    n.authors,
+    n.categories,
+    n.timestamp_utc,
+    n.processed,
+    n.processed_at,
+    n.llm_model,
+    n.market_evaluated,
+    n.market_evaluated_at,
+    -- Flattened top-level LLM fields
+    (n.llm_result->>'sentiment_score')::numeric         AS sentiment_score,
+    n.llm_result->>'sentiment_label'                    AS sentiment_label,
+    (n.llm_result->>'confidence')::numeric              AS confidence,
+    (n.llm_result->>'impact_magnitude')::int            AS impact_magnitude,
+    n.llm_result->>'transmission_channel'               AS transmission_channel,
+    n.llm_result->>'information_type'                   AS information_type,
+    n.llm_result->>'time_horizon'                       AS time_horizon,
+    n.llm_result->>'market_surprise'                    AS market_surprise,
+    (n.llm_result->>'target_horizon_hours')::int        AS target_horizon_hours,
+    (n.llm_result->>'is_mean_reverting')::boolean       AS is_mean_reverting,
+    (n.llm_result->>'is_speculative')::boolean          AS is_speculative,
+    n.llm_result->>'speculation_reason'                 AS speculation_reason,
+    n.llm_result->>'reasoning'                          AS reasoning,
+    n.llm_result->'detected_currencies'                 AS detected_currencies,
+    n.llm_result->'detected_categories'                 AS detected_categories,
+    n.llm_result->'affected_assets'                     AS affected_assets,
+    n.llm_result->'key_takeaways'                       AS key_takeaways,
+    -- Raw LLM error flag (for failed articles)
+    CASE WHEN n.llm_result ? 'error' THEN TRUE ELSE FALSE END AS llm_error,
+    n.llm_result->>'error'                              AS llm_error_message
+FROM raw_news n
+ORDER BY n.timestamp_utc ASC;

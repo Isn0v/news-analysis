@@ -138,6 +138,9 @@ flowchart TD
 | `NEUTRAL_VOLATILITY_MULTIPLIER` | `2.0` | Множитель коридора волатильности для нейтральных новостей |
 | `SENTIMENT_SCORE_THRESHOLD` | `0.1` | Порог скора для разделения направленных и нейтральных новостей |
 | `IMPULSE_WINDOW_HOURS` | `2` | Окно оценки первичного импульса (часы) |
+| `RETRACE_FADE_THRESHOLD_PCT` | `50.0` | Порог отката (в %) от пика импульса для классификации FADED |
+| `CONTINUATION_MIN_THRESH_FACTOR` | `0.5` | Минимальная доля от thresh для удержания CONTINUATION |
+| `MEAN_REVERTING_BAND_FACTOR` | `1.5` | Множитель порога для подтверждения отката к средней |
 | `BATCH_SIZE` | `5` | Пачка новостей при пакетной оценке |
 | `POLL_INTERVAL_SECONDS` | `30` | Интервал проверки новых новостей в режиме демона |
 

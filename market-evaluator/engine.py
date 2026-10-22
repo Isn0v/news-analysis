@@ -159,7 +159,12 @@ class EventStudyEngine:
                 trajectory = "CONTINUATION"
             elif target_ret is not None and initial_runup_pct > 0:
                 retrace_pct = max(0.0, min(100.0, ((initial_runup_pct - target_ret) / initial_runup_pct) * 100.0))
-                trajectory = "FADED" if retrace_pct >= 50.0 or target_ret <= (thresh * 0.5) else "CONTINUATION"
+                trajectory = (
+                    "FADED"
+                    if retrace_pct >= settings.retrace_fade_threshold_pct
+                    or target_ret <= (thresh * settings.continuation_min_thresh_factor)
+                    else "CONTINUATION"
+                )
             else:
                 trajectory = "FADED"
         elif is_impulse_confirmed and is_bearish_signal:
@@ -170,7 +175,12 @@ class EventStudyEngine:
                     0.0,
                     min(100.0, ((abs(initial_drawdown_pct) - abs(target_ret)) / abs(initial_drawdown_pct)) * 100.0),
                 )
-                trajectory = "FADED" if retrace_pct >= 50.0 or target_ret >= (-thresh * 0.5) else "CONTINUATION"
+                trajectory = (
+                    "FADED"
+                    if retrace_pct >= settings.retrace_fade_threshold_pct
+                    or target_ret >= (-thresh * settings.continuation_min_thresh_factor)
+                    else "CONTINUATION"
+                )
             else:
                 trajectory = "FADED"
         elif (
@@ -185,7 +195,7 @@ class EventStudyEngine:
         elif is_mean_reverting:
             # Ожидался откат: первичный импульс случился, и траектория откатила (FADED) либо вернулась к P0
             is_target_horizon_aligned = is_impulse_confirmed and (
-                trajectory == "FADED" or (abs(target_ret) <= thresh * 1.5)
+                trajectory == "FADED" or (abs(target_ret) <= thresh * settings.mean_reverting_band_factor)
             )
         else:
             is_target_horizon_aligned = check_alignment(target_ret)

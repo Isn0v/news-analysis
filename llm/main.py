@@ -30,18 +30,19 @@ async def test_single_article(news_id: int):
     """Тестовый анализ одной статьи по ID для проверки токена и модели."""
     db = DatabaseManager()
     await db.initialize()
-    async with db.pool.connection() as conn, conn.cursor() as cur:
-        await cur.execute(
-            "SELECT id, title, content, description, source, categories FROM raw_news WHERE id = %s;", (news_id,)
-        )
-        row = await cur.fetchone()
+    article = await db.fetch_article_by_id(news_id)
 
-    if not row:
+    if not article:
         print(f"❌ Статья с ID {news_id} не найдена в базе данных.")
         await db.close()
         return
 
-    n_id, title, content, desc, source, cats = row
+    n_id = article["id"]
+    title = article["title"]
+    content = article["content"]
+    desc = article["description"]
+    source = article["source"]
+    cats = article["categories"]
     print(f"\n📰 Анализ статьи ID {n_id}: {title}")
     print(f"🌐 Провайдер: {settings.llm_base_url} | Модель: {settings.llm_model}")
     print("⏳ Отправка запроса к модели по токену...")

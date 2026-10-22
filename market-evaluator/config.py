@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     neutral_volatility_multiplier: float = 2.0  # Множитель диапазона волатильности для нейтральных новостей (High-Low размах)
     sentiment_score_threshold: float = 0.1  # Порог скора для разделения на directional/neutral
     impulse_window_hours: int = 2  # Окно оценки первичного импульса (часы)
+    retrace_fade_threshold_pct: float = 50.0  # Порог отката (в %) от пика импульса для классификации FADED
+    continuation_min_thresh_factor: float = 0.5  # Минимальная доля от thresh для удержания CONTINUATION
+    mean_reverting_band_factor: float = 1.5  # Множитель порога для подтверждения отката к средней
     min_news_age_hours: float = 4.0  # Минимальный возраст новости для оценки в воркере
 
     # Параметры воркера
