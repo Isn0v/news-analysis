@@ -53,6 +53,9 @@ class AssetImpact(BaseModel):
 
 
 class SentimentAnalysisResult(BaseModel):
+    reasoning: str = Field(
+        description="Rigorous Chain-of-Thought economic rationale in English explaining the transmission mechanism to supply, demand, and liquidity BEFORE determining the score and metrics"
+    )
     sentiment_score: float = Field(
         ge=-1.0,
         le=1.0,
@@ -109,9 +112,6 @@ class SentimentAnalysisResult(BaseModel):
     detected_categories: list[str] = Field(
         default_factory=list,
         description="Standardized categories selected from: ['Macro', 'Regulation', 'ETF', 'DeFi', 'Security/Hack', 'Layer 1', 'Layer 2', 'Exchange', 'Mining', 'Adoption', 'Tokenomics', 'Derivatives', 'Market Analysis']",
-    )
-    reasoning: str = Field(
-        description="Rigorous Chain-of-Thought economic rationale in English explaining the transmission mechanism to supply, demand, and liquidity"
     )
 
     @model_validator(mode="after")

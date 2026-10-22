@@ -72,11 +72,105 @@ SCORING & VALUATION FRAMEWORK:
 
 9. Raw JSON Output:
    - Output strictly valid raw JSON. Do NOT wrap the JSON in markdown code fences (```json ... ```). Start output directly with '{' and end with '}'.
+
+10. INSTITUTIONAL CALIBRATION EXAMPLES (FEW-SHOT):
+Example 1: Moderate Macro Headwind (Real estate / mortgage data)
+Event: "US existing home sales fall to 14-year low as mortgage rates stay above 7%"
+Output:
+{
+  "reasoning": "High mortgage rates and frozen housing turnover indicate tight monetary conditions and consumer liquidity strain, which modestly dampens speculative appetite for risk assets. However, it is not an immediate solvency crisis for crypto.",
+  "sentiment_score": -0.25,
+  "sentiment_label": "bearish",
+  "confidence": 0.85,
+  "impact_magnitude": 3,
+  "time_horizon": "short_term_1d_3d",
+  "information_type": "macro_release",
+  "market_surprise": "in_line",
+  "transmission_channel": "liquidity_and_rates",
+  "affected_assets": [{"ticker": "BTC", "sentiment": -0.25, "reason": "General macro liquidity contraction"}],
+  "key_takeaways": ["Mortgage rates above 7% freeze housing turnover", "Broader consumer liquidity headwinds for speculative assets"],
+  "target_horizon_hours": 24,
+  "is_mean_reverting": false,
+  "is_speculative": false,
+  "speculation_reason": "Official macroeconomic housing dataset release",
+  "detected_currencies": ["BTC"],
+  "detected_categories": ["Macro"]
+}
+
+Example 2: Protocol Exchange Listing Catalyst
+Event: "Coinbase announces listing of Arbitrum (ARB) with USD order books opening Thursday"
+Output:
+{
+  "reasoning": "Tier-1 exchange listing expands direct retail and institutional fiat access to ARB, deepening liquidity and trading volume without directly altering broad Bitcoin supply/demand.",
+  "sentiment_score": 0.35,
+  "sentiment_label": "bullish",
+  "confidence": 0.90,
+  "impact_magnitude": 4,
+  "time_horizon": "immediate_1h_4h",
+  "information_type": "hard_fact",
+  "market_surprise": "better_than_expected",
+  "transmission_channel": "general_crypto",
+  "affected_assets": [{"ticker": "ARB", "sentiment": 0.45, "reason": "Direct spot fiat on-ramp and liquidity expansion"}],
+  "key_takeaways": ["Coinbase adds USD pairs for ARB", "Trading live on Thursday with standard liquidity criteria"],
+  "target_horizon_hours": 4,
+  "is_mean_reverting": false,
+  "is_speculative": false,
+  "speculation_reason": "Confirmed exchange corporate announcement",
+  "detected_currencies": ["ARB"],
+  "detected_categories": ["Exchange", "Layer 2"]
+}
+
+Example 3: Speculative Retail Noise / Technical Opinion
+Event: "Analyst predicts Bitcoin could plunge to $40K based on head-and-shoulders pattern"
+Output:
+{
+  "reasoning": "Technical chart interpretations and individual trader predictions do not alter underlying spot liquidity, miner flows, or institutional capital allocation, representing retail noise with high mean-reversion probability.",
+  "sentiment_score": -0.15,
+  "sentiment_label": "bearish",
+  "confidence": 0.70,
+  "impact_magnitude": 2,
+  "time_horizon": "immediate_1h_4h",
+  "information_type": "opinion_analysis",
+  "market_surprise": "not_applicable",
+  "transmission_channel": "none",
+  "affected_assets": [{"ticker": "BTC", "sentiment": -0.15, "reason": "Short-term retail sentiment headwind"}],
+  "key_takeaways": ["Analyst cites head-and-shoulders pattern targeting $40K", "Purely subjective chart opinion without on-chain or macro catalyst"],
+  "target_horizon_hours": 4,
+  "is_mean_reverting": true,
+  "is_speculative": true,
+  "speculation_reason": "Unsubstantiated technical chart pattern opinion",
+  "detected_currencies": ["BTC"],
+  "detected_categories": ["Market Analysis"]
+}
+
+Example 4: Severe Systemic Catastrophe (Anchor for extreme scores <= -0.80)
+Event: "Major cross-chain bridge drained of $350M in exploit; validators halt chain"
+Output:
+{
+  "reasoning": "Catastrophic liquidity drain directly impacts DeFi collateral backing, triggering liquidations and market-wide contagion fears across lending protocols.",
+  "sentiment_score": -0.85,
+  "sentiment_label": "bearish",
+  "confidence": 0.95,
+  "impact_magnitude": 9,
+  "time_horizon": "immediate_1h_4h",
+  "information_type": "hard_fact",
+  "market_surprise": "worse_than_expected",
+  "transmission_channel": "defi_tech_exploit",
+  "affected_assets": [{"ticker": "BTC", "sentiment": -0.70, "reason": "Market-wide liquidity drain and risk-off contagion"}],
+  "key_takeaways": ["$350M drained from cross-chain bridge", "Validators halt chain to prevent further asset drainage"],
+  "target_horizon_hours": 4,
+  "is_mean_reverting": false,
+  "is_speculative": false,
+  "speculation_reason": "Confirmed catastrophic on-chain security exploit",
+  "detected_currencies": ["BTC"],
+  "detected_categories": ["Security/Hack", "DeFi"]
+}
 """
 
 FALLBACK_JSON_INSTRUCTION = """
 IMPORTANT: Output your response strictly as a single valid JSON object containing ALL of the following fields:
 {
+  "reasoning": "Detailed economic rationale in English explaining the transmission mechanism to supply, demand, and liquidity BEFORE determining score and magnitude",
   "sentiment_score": 0.0,
   "sentiment_label": "bullish" | "bearish" | "neutral",
   "confidence": 0.85,
@@ -92,8 +186,7 @@ IMPORTANT: Output your response strictly as a single valid JSON object containin
   "is_speculative": false,
   "speculation_reason": "One concise sentence in English",
   "detected_currencies": ["BTC"],
-  "detected_categories": ["Macro"],
-  "reasoning": "Detailed economic rationale in English"
+  "detected_categories": ["Macro"]
 }
 Every field is strictly required. Do not omit any keys. Output only valid raw JSON without preamble.
 """

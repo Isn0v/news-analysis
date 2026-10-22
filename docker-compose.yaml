@@ -34,23 +34,23 @@ services:
   #   depends_on:
   #     - db
 
-  local-mlx-llm:
-    build: ./llm
-    restart: always
-    env_file:
-      - llm/.env.mlx.deepseek
-    environment:
-      POSTGRES_HOST: db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - db
+  # local-mlx-llm:
+  #   build: ./llm
+  #   restart: always
+  #   env_file:
+  #     - llm/.env.mlx.deepseek
+  #   environment:
+  #     POSTGRES_HOST: db
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     - db
 
-  remote-gemini-llm:
+  remote-llm:
     build: ./llm
     restart: always
     env_file:
-      - llm/.env.gemini
+      - llm/.env.proxyapi
     environment:
       POSTGRES_HOST: db
     extra_hosts:
