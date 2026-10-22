@@ -69,25 +69,40 @@ class DatabaseManager:
             await cur.execute(RELEASE_ARTICLE_LOCK_QUERY, (news_ids,))
             await conn.commit()
 
-    async def save_llm_result(self, news_id: int, result: SentimentAnalysisResult):
+    async def save_llm_result(
+        self,
+        news_id: int,
+        result: SentimentAnalysisResult,
+        model: str | None = None,
+    ):
         """Сохраняет размеченный сентимент в JSONB-колонку llm_result и выставляет processed = TRUE."""
-        result_json = result.model_dump_json()
+        llm_model = model or settings.llm_model
+        result_dict = result.model_dump()
+        result_dict["model_name"] = llm_model
+        result_json = json.dumps(result_dict)
 
         async with self.pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(SAVE_LLM_RESULT_QUERY, (result_json, news_id))
+            await cur.execute(SAVE_LLM_RESULT_QUERY, (result_json, llm_model, news_id))
             await conn.commit()
 
-    async def save_llm_error(self, news_id: int, error_message: str):
+    async def save_llm_error(
+        self,
+        news_id: int,
+        error_message: str,
+        model: str | None = None,
+    ):
         """Сохраняет статус ошибки для статьи, чтобы избежать бесконечного зацикливания воркера."""
+        llm_model = model or settings.llm_model
         error_payload = json.dumps(
             {
                 "error": error_message,
+                "model_name": llm_model,
                 "failed_at": datetime.now(UTC).isoformat(),
             }
         )
 
         async with self.pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(SAVE_LLM_RESULT_QUERY, (error_payload, news_id))
+            await cur.execute(SAVE_LLM_RESULT_QUERY, (error_payload, llm_model, news_id))
             await conn.commit()
 
     async def get_stats(self) -> dict[str, int]:

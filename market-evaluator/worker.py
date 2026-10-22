@@ -77,6 +77,7 @@ class MarketEvaluationWorker:
         impact_magnitude = int(llm_result.get("impact_magnitude", 5))
         target_horizon_hours = int(llm_result.get("target_horizon_hours", 4))
         is_mean_reverting = bool(llm_result.get("is_mean_reverting", False))
+        llm_model = article.get("llm_model") or llm_result.get("model_name") or "unknown"
 
         if not affected_assets:
             logger.debug("У статьи [ID %d] нет затронутых активов", news_id)
@@ -128,6 +129,7 @@ class MarketEvaluationWorker:
                     target_horizon_hours=target_horizon_hours,
                     is_mean_reverting=is_mean_reverting,
                     is_speculative=is_speculative,
+                    llm_model=llm_model,
                 )
 
                 if metrics:

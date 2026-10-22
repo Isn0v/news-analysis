@@ -50,7 +50,22 @@ async def async_main():
             print("=" * 60)
             for k, v in stats.items():
                 print(f"  {k:25}: {v}")
-            print("=" * 60 + "\n")
+            print("=" * 60)
+
+            model_stats = await worker.db.get_model_stats()
+            if model_stats:
+                print("\n" + "=" * 60)
+                print("🤖 СРАВНИТЕЛЬНЫЙ АНАЛИЗ ПО LLM-МОДЕЛЯМ:")
+                print("=" * 60)
+                for row in model_stats:
+                    print(f"  Модель: {row['model']}")
+                    print(f"    Всего оценок:      {row['total_evals']} (Фактов: {row['factual_evals']})")
+                    print(f"    Всплеск объема:    x{row['avg_vol_surge']}")
+                    print(f"    Импульс (Факты):   {row['factual_impulse_pct']}%")
+                    print(f"    Направление 4ч:    {row['factual_dir_4h_pct']}%")
+                    print(f"    Fade спекуляций:   {row['fade_rate_pct']}%")
+                    print()
+            print()
 
         elif args.news_id:
             print(f"\n🔍 Анализ рыночной реакции для новости ID {args.news_id}...")

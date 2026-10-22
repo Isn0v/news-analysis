@@ -26,6 +26,7 @@ class EventStudyEngine:
         target_horizon_hours: int = 4,
         is_mean_reverting: bool = False,
         is_speculative: bool = False,
+        llm_model: str = "unknown",
     ) -> EventStudyMetrics | None:
         """Вычисляет полный набор метрик доходностей, просадок и точности прогноза."""
         if not candles:
@@ -210,6 +211,7 @@ class EventStudyEngine:
         return EventStudyMetrics(
             ticker=ticker,
             symbol=symbol,
+            llm_model=llm_model,
             t0_timestamp=t0_timestamp,
             p0_price=round(p0, 4),
             pre_drift_pct=round(pre_drift_pct, 3),

@@ -3,7 +3,8 @@ SELECT
     n.source,
     n.title,
     n.timestamp_utc,
-    n.llm_result
+    n.llm_result,
+    COALESCE(n.llm_model, n.llm_result->>'model_name', 'unknown') AS llm_model
 FROM raw_news n
 WHERE n.processed = TRUE
   AND n.llm_result IS NOT NULL

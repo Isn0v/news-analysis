@@ -2,6 +2,7 @@ INSERT INTO news_market_impact (
     news_id,
     ticker,
     symbol,
+    llm_model,
     t0_timestamp,
     p0_price,
     pre_drift_pct,
@@ -33,6 +34,7 @@ INSERT INTO news_market_impact (
     %(news_id)s,
     %(ticker)s,
     %(symbol)s,
+    %(llm_model)s,
     %(t0_timestamp)s,
     %(p0_price)s,
     %(pre_drift_pct)s,
@@ -63,6 +65,7 @@ INSERT INTO news_market_impact (
 )
 ON CONFLICT (news_id, ticker) DO UPDATE SET
     symbol = EXCLUDED.symbol,
+    llm_model = COALESCE(EXCLUDED.llm_model, news_market_impact.llm_model),
     p0_price = EXCLUDED.p0_price,
     pre_drift_pct = EXCLUDED.pre_drift_pct,
     volume_surge_ratio = EXCLUDED.volume_surge_ratio,

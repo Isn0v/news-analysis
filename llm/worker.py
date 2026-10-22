@@ -104,7 +104,7 @@ class SentimentWorker:
                     categories=article["categories"],
                 )
 
-                await self.db.save_llm_result(news_id=news_id, result=result)
+                await self.db.save_llm_result(news_id=news_id, result=result, model=self.analyzer.model)
 
                 logger.info(
                     "✅ [%s | ID %d | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
@@ -135,7 +135,7 @@ class SentimentWorker:
             except (APIError, ValidationError, ValueError, KeyError) as e:
                 logger.error("❌ [%s] Ошибка обработки статьи [ID %d] '%s': %s", self.worker_id, news_id, title[:40], e)
                 try:
-                    await self.db.save_llm_error(news_id=news_id, error_message=str(e))
+                    await self.db.save_llm_error(news_id=news_id, error_message=str(e), model=self.analyzer.model)
                     logger.warning(
                         "Статья [ID %d] помечена как обработанная с записью ошибки во избежание зацикливания.", news_id
                     )

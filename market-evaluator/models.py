@@ -22,6 +22,7 @@ class EventStudyMetrics(BaseModel):
 
     ticker: str
     symbol: str
+    llm_model: str = "unknown"
     t0_timestamp: datetime
     p0_price: float
     pre_drift_pct: float

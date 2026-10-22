@@ -83,6 +83,7 @@ SELECT
     n.timestamp_utc,
     n.processed,
     n.processed_at,
+    n.llm_model,
     n.market_evaluated,
     n.market_evaluated_at,
     -- Flattened top-level LLM fields
@@ -114,6 +115,7 @@ QUERY_MARKET_IMPACT = """
 SELECT
     m.id             AS impact_id,
     m.news_id,
+    COALESCE(m.llm_model, n.llm_model) AS llm_model,
     n.source,
     n.title,
     n.timestamp_utc  AS news_published_at,
@@ -157,6 +159,7 @@ SELECT
     n.source,
     n.title,
     n.timestamp_utc  AS news_published_at,
+    COALESCE(m.llm_model, n.llm_model) AS llm_model,
     -- LLM
     (n.llm_result->>'sentiment_score')::numeric         AS sentiment_score,
     n.llm_result->>'sentiment_label'                    AS sentiment_label,
