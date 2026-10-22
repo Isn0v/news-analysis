@@ -21,6 +21,11 @@ func NewRepository(db *sql.DB) *Repository {
 // Возвращает (true, nil), если новость была сохранена,
 // и (false, nil), если она была пропущена как дубликат по URL.
 func (r *Repository) Save(item model.NewsItem) (bool, error) {
+	market := item.Market
+	if market == "" {
+		market = "moex"
+	}
+
 	result, err := r.db.Exec(InsertNewsQuery,
 		toNullString(item.GUID),
 		item.URL,
@@ -35,6 +40,7 @@ func (r *Repository) Save(item model.NewsItem) (bool, error) {
 		pq.Array(item.Categories),
 		item.Description,
 		item.Content,
+		market,
 	)
 	if err != nil {
 		return false, err

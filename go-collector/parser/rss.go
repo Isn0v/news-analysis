@@ -153,6 +153,7 @@ func FetchFeed(src model.Source, ch chan<- model.NewsItem, wg *sync.WaitGroup) {
 			Categories:   item.Categories,
 			Description:  item.Description,
 			Content:      content,
+			Market:       src.Market,
 		}
 		count++
 	}

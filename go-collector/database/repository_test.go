@@ -35,6 +35,7 @@ func TestRepository_SaveAndDeduplicate(t *testing.T) {
 		Categories:   []string{"TestCat"},
 		Description:  "Short test description",
 		Content:      "Full test content for integration verification",
+		Market:       "moex",
 	}
 
 	// 1. Первая вставка должна успешно сохраниться (isNew == true)
@@ -56,5 +57,5 @@ func TestRepository_SaveAndDeduplicate(t *testing.T) {
 	}
 
 	// Очистка тестовых данных
-	_, _ = db.Exec("DELETE FROM raw_news WHERE link = $1", uniqueURL)
+	_, _ = db.Exec("DELETE FROM raw_news WHERE url = $1", uniqueURL)
 }
