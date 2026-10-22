@@ -64,6 +64,10 @@ eval-batch:
 eval-stats:
 	cd market-evaluator && uv run python main.py --stats
 
+## eval-recalculate: пересчитать метрики рынка с актуальным порогом neutral_threshold_pct
+eval-recalculate:
+	cd market-evaluator && uv run python main.py --recalculate
+
 ## db-export: экспортировать все данные из БД в CSV и JSON (./market-evaluator/exports/)
 db-export:
 	cd market-evaluator && uv run python export.py --output-dir ./exports

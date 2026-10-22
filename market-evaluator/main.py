@@ -29,6 +29,11 @@ async def async_main():
     parser.add_argument("--batch", action="store_true", help="Оценить все доступные статьи пачкой")
     parser.add_argument("--limit", type=int, default=100, help="Лимит статей для пакетного режима")
     parser.add_argument("--stats", action="store_true", help="Показать статистику точности прогнозов")
+    parser.add_argument(
+        "--recalculate",
+        action="store_true",
+        help="Пересчитать метрики подтверждения импульса и согласованности по текущему neutral_threshold_pct",
+    )
     parser.add_argument("--daemon", action="store_true", help="Запустить в режиме непрерывного демона")
 
     args = parser.parse_args()
@@ -56,6 +61,35 @@ async def async_main():
             if model_stats:
                 print("\n" + "=" * 60)
                 print("🤖 СРАВНИТЕЛЬНЫЙ АНАЛИЗ ПО LLM-МОДЕЛЯМ:")
+                print("=" * 60)
+                for row in model_stats:
+                    print(f"  Модель: {row['model']}")
+                    print(f"    Всего оценок:      {row['total_evals']} (Фактов: {row['factual_evals']})")
+                    print(f"    Всплеск объема:    x{row['avg_vol_surge']}")
+                    print(f"    Импульс (Факты):   {row['factual_impulse_pct']}%")
+                    print(f"    Направление 4ч:    {row['factual_dir_4h_pct']}%")
+                    print(f"    Fade спекуляций:   {row['fade_rate_pct']}%")
+                    print()
+            print()
+
+        elif args.recalculate:
+            thresh = settings.neutral_threshold_pct
+            print(f"\n⚙️  Пересчет всех исторических метрик с порогом neutral_threshold_pct = ±{thresh}%...")
+            count = await worker.db.recalculate_all_impacts(thresh)
+            print(f"✅ Успешно пересчитано {count} записей в news_market_impact.\n")
+
+            stats = await worker.db.get_stats()
+            print("=" * 60)
+            print(f"📊 ОБНОВЛЕННАЯ СТАТИСТИКА (ПОРОГ ИМПУЛЬСА: ±{thresh}%):")
+            print("=" * 60)
+            for k, v in stats.items():
+                print(f"  {k:25}: {v}")
+            print("=" * 60)
+
+            model_stats = await worker.db.get_model_stats()
+            if model_stats:
+                print("\n" + "=" * 60)
+                print(f"🤖 СРАВНИТЕЛЬНЫЙ АНАЛИЗ ПО LLM-МОДЕЛЯМ (ПОРОГ: ±{thresh}%):")
                 print("=" * 60)
                 for row in model_stats:
                     print(f"  Модель: {row['model']}")
