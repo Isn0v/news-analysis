@@ -14,6 +14,7 @@ FROM claim
 WHERE raw_news.id = claim.id
 RETURNING 
     raw_news.id, 
+    raw_news.market,
     raw_news.source, 
     raw_news.title, 
     COALESCE(raw_news.categories, '{}') AS categories, 

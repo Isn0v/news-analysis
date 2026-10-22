@@ -128,7 +128,10 @@ func FetchFeed(src model.Source, ch chan<- model.NewsItem, wg *sync.WaitGroup) {
 	for _, item := range feed.Items {
 		content := strings.TrimSpace(item.Content)
 		if content == "" {
-			content = item.Description
+			content = strings.TrimSpace(item.Description)
+		}
+		if content == "" {
+			content = strings.TrimSpace(item.Title)
 		}
 
 		publishedAt := time.Now().UTC()

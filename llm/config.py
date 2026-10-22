@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     # Параметры распределенной очереди и воркера
     worker_id: str = ""
+    target_market: str = "all"  # "all", "moex" или "crypto"
     lock_timeout_minutes: int = 5
     batch_size: int = 3
     poll_interval_seconds: int = 10
@@ -42,6 +43,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     def model_post_init(self, context: Any, /) -> None:
+        import os
+
+        # Поддержка LLM_TARGET_MARKET наряду с TARGET_MARKET
+        llm_tm = os.getenv("LLM_TARGET_MARKET")
+        if llm_tm:
+            self.target_market = llm_tm.lower().strip()
+        else:
+            self.target_market = self.target_market.lower().strip()
+
         # Если worker_id не задан явно через WORKER_ID, генерируем читаемый ID
         if not self.worker_id:
             import socket

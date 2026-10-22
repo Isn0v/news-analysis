@@ -16,6 +16,7 @@ type Config struct {
 	PostgresPassword string
 	PostgresDB       string
 	PollInterval     time.Duration
+	Market           string
 }
 
 // Load загружает переменные среды (с поддержкой локальных .env и ../.env файлов).
@@ -29,6 +30,7 @@ func Load() (*Config, error) {
 		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
 		PostgresDB:       getEnv("POSTGRES_DB", "crypto_news"),
 		PollInterval:     5 * time.Minute,
+		Market:           getEnv("COLLECTOR_MARKET", "moex"),
 	}
 
 	if cfg.PostgresPassword == "" {

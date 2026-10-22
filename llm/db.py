@@ -10,6 +10,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from queries import (
     FETCH_NEWS_BY_ID_QUERY,
+    FETCH_UNPROCESSED_BATCH_BY_MARKET_QUERY,
     FETCH_UNPROCESSED_BATCH_QUERY,
     GET_TABLE_STATS_QUERY,
     RELEASE_ARTICLE_LOCK_QUERY,
@@ -58,14 +59,24 @@ class DatabaseManager:
     async def fetch_unprocessed_batch(
         self,
         limit: int,
+        market: str | None = None,
         worker_id: str | None = None,
         lock_timeout_minutes: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Извлекает и атомарно блокирует пачку необработанных новостей (SKIP LOCKED)."""
+        """Извлекает и атомарно блокирует пачку необработанных новостей (SKIP LOCKED).
+
+        При указании market (или через settings.target_market) фильтрует строго по рынку ('moex' / 'crypto').
+        Если market == 'all', извлекает новости любого рынка.
+        """
         wid = worker_id or settings.worker_id
         timeout = lock_timeout_minutes or settings.lock_timeout_minutes
+        target = (market or settings.target_market).lower().strip()
+
         async with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            await cur.execute(FETCH_UNPROCESSED_BATCH_QUERY, (limit, timeout, wid))
+            if target and target != "all":
+                await cur.execute(FETCH_UNPROCESSED_BATCH_BY_MARKET_QUERY, (target, limit, timeout, wid))
+            else:
+                await cur.execute(FETCH_UNPROCESSED_BATCH_QUERY, (limit, timeout, wid))
             return await cur.fetchall()
 
     async def release_locks(self, news_ids: list[int]):

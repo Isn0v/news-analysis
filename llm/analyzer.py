@@ -12,7 +12,11 @@ from openai import (
     LengthFinishReasonError,
     RateLimitError,
 )
-from prompt import FALLBACK_JSON_INSTRUCTION, SYSTEM_PROMPT, build_analysis_user_prompt
+from prompt import (
+    FALLBACK_JSON_INSTRUCTION,
+    build_analysis_user_prompt,
+    get_system_prompt,
+)
 from pydantic import ValidationError
 from schema import SentimentAnalysisResult
 from tenacity import (
@@ -56,6 +60,7 @@ class SentimentAnalyzer:
         content: str,
         source: str,
         categories: list[str],
+        market: str = "crypto",
     ) -> SentimentAnalysisResult:
         """Анализирует статью и возвращает строго типизированный SentimentAnalysisResult."""
         try:
@@ -65,6 +70,7 @@ class SentimentAnalyzer:
                 source=source,
                 categories=categories,
                 max_chars=settings.max_content_chars,
+                market=market,
             )
         except BadRequestError as bad_req_err:
             err_msg = str(bad_req_err).lower()
@@ -80,6 +86,7 @@ class SentimentAnalyzer:
                     source=source,
                     categories=categories,
                     max_chars=2000,
+                    market=market,
                 )
             raise
 
@@ -90,6 +97,7 @@ class SentimentAnalyzer:
         source: str,
         categories: list[str],
         max_chars: int,
+        market: str = "crypto",
     ) -> SentimentAnalysisResult:
         """Внутренний метод инференса с попыткой Structured Output и fallback'ом."""
         user_prompt = build_analysis_user_prompt(
@@ -97,17 +105,19 @@ class SentimentAnalyzer:
             source=source,
             categories=categories,
             content=content,
+            market=market,
             max_chars=max_chars,
         )
+        system_prompt = get_system_prompt(market) + FALLBACK_JSON_INSTRUCTION
 
-        logger.debug("Отправка статьи '%s' на анализ в модель %s...", title[:50], self.model)
+        logger.debug("Отправка статьи '%s' [%s] на анализ в модель %s...", title[:50], market, self.model)
 
         # 1. Попытка через стандартный Structured Outputs метод .parse()
         try:
             parse_kwargs = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT + FALLBACK_JSON_INSTRUCTION},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 "response_format": SentimentAnalysisResult,
@@ -154,7 +164,7 @@ class SentimentAnalyzer:
         fallback_kwargs = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT + FALLBACK_JSON_INSTRUCTION},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": self.temperature,

@@ -166,3 +166,39 @@ def test_align_sentiment_sign_and_label():
     )
     assert res_neutral_ok.sentiment_score == 0.05
     assert res_neutral_ok.sentiment_label == SentimentLabel.NEUTRAL
+
+
+def test_moex_result_validation():
+    """Проверка валидации результата для рынка РФ (MOEX) с общими полями."""
+    data = {
+        "sentiment_score": 0.80,
+        "sentiment_label": "bullish",
+        "confidence": 0.95,
+        "impact_magnitude": 8,
+        "time_horizon": "immediate_1h_4h",
+        "information_type": "hard_fact",
+        "market_surprise": "better_than_expected",
+        "transmission_channel": "dividend_catalyst",
+        "affected_assets": [
+            {"ticker": "SBER", "sentiment": 0.85, "reason": "Рекордные дивиденды выше ожиданий консенсуса"},
+            {"ticker": "IMOEX", "sentiment": 0.50, "reason": "Вес Сбера тянет весь индекс Мосбиржи вверх"},
+        ],
+        "key_takeaways": [
+            "Совет директоров Сбера рекомендовал дивиденды 33.3 рубля",
+            "Дивидендная доходность превышает 10.5%",
+        ],
+        "target_horizon_hours": 4,
+        "is_mean_reverting": False,
+        "is_speculative": False,
+        "speculation_reason": "Официальное решение Совета директоров на сервере раскрытия",
+        "detected_currencies": ["SBER", "IMOEX"],
+        "detected_categories": ["Dividends", "Banking"],
+        "reasoning": "Высокие дивиденды обеспечивают значительный приток ликвидности частных инвесторов на Мосбирже.",
+    }
+
+    result = SentimentAnalysisResult.model_validate(data)
+    assert result.sentiment_score == 0.80
+    assert result.sentiment_label == SentimentLabel.BULLISH
+    assert result.affected_assets[0].ticker == "SBER"
+    assert result.transmission_channel.value == "dividend_catalyst"
+    assert result.detected_currencies == ["SBER", "IMOEX"]

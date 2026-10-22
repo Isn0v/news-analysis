@@ -26,12 +26,23 @@ class MarketSurprise(str, Enum):
 
 
 class TransmissionChannel(str, Enum):
-    LIQUIDITY_AND_RATES = "liquidity_and_rates"  # Liquidity channel (Fed, interest rates, QE/QT, DXY)
-    FIAT_DEBASEMENT = "fiat_debasement"  # Currency debasement (inflation, M2 expansion, sovereign debt)
-    GEOPOLITICAL_RISK = "geopolitical_risk"  # Geopolitics (conflicts, sanctions, flight to cash/gold)
-    REGULATORY = "regulatory"  # Legal & enforcement (SEC, MiCA, court rulings, bans)
-    DEFI_TECH_EXPLOIT = "defi_tech_exploit"  # Exploits, smart contract bugs, bridge hacks, forks
-    GENERAL_CRYPTO = "general_crypto"  # Native crypto ecosystem (listings, tokenomics, mainnet)
+    # Универсальные макро-каналы
+    LIQUIDITY_AND_RATES = "liquidity_and_rates"  # Монетарная политика, процентные ставки (ЦБ РФ / ФРС), ликвидность
+    FIAT_DEBASEMENT = "fiat_debasement"  # Обесценение валюты, инфляция (ИПЦ/CPI), денежная масса
+    GEOPOLITICAL_RISK = "geopolitical_risk"  # Геополитика, конфликты, санкции, внешнеторговые шоки
+    REGULATORY = "regulatory"  # Регуляторные меры, законы, судебные решения, надзорные органы
+
+    # Корпоративные и фундаментальные каналы (Equities / MOEX)
+    DIVIDEND_CATALYST = "dividend_catalyst"  # Дивидендные рекомендации, отсечки, доходности
+    FINANCIAL_EARNINGS = "financial_earnings"  # Финансовая отчетность (РСБУ / МСФО), чистая прибыль, выручка, EBITDA
+    COMMODITY_AND_FX = "commodity_and_fx"  # Цены на сырье (Urals, Brent, газ, металлы) и курсы валют (CNY/RUB, USD/RUB)
+    CORPORATE_ACTION = "corporate_action"  # Корпоративные действия: байбэки, редомициляция, M&A, допэмиссии (SPO)
+
+    # Специфичные каналы рынков
+    DEFI_TECH_EXPLOIT = "defi_tech_exploit"  # Эксплойты смарт-контрактов, взломы, технические сбои
+    RETAIL_HYPE = "retail_hype"  # Эмоциональный разгон розничной толпы, пампы в Telegram-каналах
+    GENERAL_MARKET = "general_market"  # Общерыночные события, листинги, ребалансировки индексов
+    GENERAL_CRYPTO = "general_crypto"  # Нативная крипто-экосистема (для обратной совместимости)
     NONE = "none"
 
 
@@ -43,7 +54,9 @@ class TimeHorizon(str, Enum):
 
 
 class AssetImpact(BaseModel):
-    ticker: str = Field(description="Standard ticker of the impacted crypto asset (e.g. 'BTC', 'ETH', 'SOL', 'XRP')")
+    ticker: str = Field(
+        description="Standard uppercase ticker of the impacted asset (e.g. 'SBER', 'GAZP', 'LKOH', 'IMOEX' for MOEX; 'BTC', 'ETH', 'SOL' for Crypto)"
+    )
     sentiment: float = Field(
         ge=-1.0,
         le=1.0,
@@ -107,11 +120,11 @@ class SentimentAnalysisResult(BaseModel):
     )
     detected_currencies: list[str] = Field(
         default_factory=list,
-        description="List of uppercase crypto tickers mentioned (e.g. ['BTC', 'ETH']). For broad market news use ['BTC']",
+        description="List of uppercase asset tickers mentioned (e.g. ['SBER', 'IMOEX'] for MOEX; ['BTC', 'ETH'] for crypto). For broad market events use ['IMOEX'] or ['BTC']",
     )
     detected_categories: list[str] = Field(
         default_factory=list,
-        description="Standardized categories selected from: ['Macro', 'Regulation', 'ETF', 'DeFi', 'Security/Hack', 'Layer 1', 'Layer 2', 'Exchange', 'Mining', 'Adoption', 'Tokenomics', 'Derivatives', 'Market Analysis']",
+        description="Standardized categories selected from: ['Macro', 'Regulation', 'Dividends', 'Earnings', 'Sanctions', 'Commodities', 'Corporate Action', 'Banking', 'ETF', 'DeFi', 'Security/Hack', 'Exchange', 'Retail Sentiment', 'Market Analysis']",
     )
 
     @model_validator(mode="after")

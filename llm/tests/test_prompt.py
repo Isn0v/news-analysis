@@ -1,6 +1,28 @@
 """Tests for LLM prompt construction and parameterization."""
 
-from prompt import build_analysis_user_prompt
+from prompt import (
+    CRYPTO_SYSTEM_PROMPT,
+    MOEX_SYSTEM_PROMPT,
+    build_analysis_user_prompt,
+    get_system_prompt,
+)
+
+
+def test_get_system_prompt_routing():
+    """Verify system prompt routes correctly by market."""
+    moex_prompt = get_system_prompt("moex")
+    assert moex_prompt == MOEX_SYSTEM_PROMPT
+    assert "Moscow Exchange" in moex_prompt
+    assert "SBER" in moex_prompt
+    assert "dividend_catalyst" in moex_prompt
+
+    crypto_prompt = get_system_prompt("crypto")
+    assert crypto_prompt == CRYPTO_SYSTEM_PROMPT
+    assert "Senior Quantitative Crypto Research Analyst" in crypto_prompt
+    assert "BTC" in crypto_prompt
+
+    default_prompt = get_system_prompt("")
+    assert default_prompt == crypto_prompt
 
 
 def test_build_analysis_user_prompt_formatting():
@@ -10,12 +32,29 @@ def test_build_analysis_user_prompt_formatting():
         source="CoinDesk",
         categories=["Regulation", "Bitcoin"],
         content="The Securities and Exchange Commission has approved the first spot Bitcoin ETF.",
+        market="crypto",
     )
 
     assert "SOURCE: CoinDesk" in prompt
+    assert "MARKET: CRYPTO" in prompt
     assert "EDITORIAL CATEGORIES: Regulation, Bitcoin" in prompt
     assert "TITLE: SEC Approves Bitcoin ETF" in prompt
     assert "The Securities and Exchange Commission has approved" in prompt
+
+
+def test_build_analysis_user_prompt_moex_market():
+    """Verify MOEX market labeling in user prompt."""
+    prompt = build_analysis_user_prompt(
+        title="Сбербанк рекомендовал рекордные дивиденды",
+        source="rbc",
+        categories=["Финансы", "Дивиденды"],
+        content="Совет директоров рекомендовал выплатить 33.3 рубля на акцию.",
+        market="moex",
+    )
+
+    assert "MARKET: MOEX" in prompt
+    assert "RUSSIAN FINANCIAL MARKET (MOEX / FORTS)" in prompt
+    assert "TITLE: Сбербанк рекомендовал рекордные дивиденды" in prompt
 
 
 def test_build_analysis_user_prompt_empty_categories():

@@ -42,9 +42,16 @@ async def test_fetch_unprocessed_batch_query():
         assert isinstance(batch, list)
         for item in batch:
             assert "id" in item
+            assert "market" in item
             assert "title" in item
             assert "content" in item
             assert "source" in item
+
+        # Проверка выборки с фильтрацией по рынку
+        moex_batch = await db.fetch_unprocessed_batch(limit=2, market="moex")
+        assert isinstance(moex_batch, list)
+        for item in moex_batch:
+            assert item["market"] == "moex"
     finally:
         await db.close()
 

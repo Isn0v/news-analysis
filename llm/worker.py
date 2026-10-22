@@ -31,11 +31,14 @@ class SentimentWorker:
 
         stats = await self.db.get_stats()
         logger.info(
-            "Старт воркера сентимента [%s]. Всего статей: %d | Обработано: %d | Ожидает: %d",
+            "Старт воркера сентимента [%s] [Рынок: %s]. Всего: %d | Обработано: %d | Очередь: %d (MOEX: %d, Crypto: %d)",
             self.worker_id,
+            settings.target_market.upper(),
             stats["total"],
             stats["processed"],
             stats["unprocessed"],
+            stats.get("moex_unprocessed", 0),
+            stats.get("crypto_unprocessed", 0),
         )
 
         while self.running:
@@ -63,6 +66,7 @@ class SentimentWorker:
         """Извлекает и параллельно обрабатывает одну пачку новостей (атомарный захват SKIP LOCKED)."""
         batch = await self.db.fetch_unprocessed_batch(
             limit=settings.batch_size,
+            market=settings.target_market,
             worker_id=self.worker_id,
             lock_timeout_minutes=settings.lock_timeout_minutes,
         )
@@ -95,21 +99,24 @@ class SentimentWorker:
             news_id = article["id"]
             title = article["title"]
             source = article["source"]
+            market = article.get("market") or "crypto"
 
             try:
                 result = await self.analyzer.analyze_article(
                     title=title,
-                    content=article["content"] or article["description"],
+                    content=article["content"] or article["description"] or title,
                     source=source,
                     categories=article["categories"],
+                    market=market,
                 )
 
                 await self.db.save_llm_result(news_id=news_id, result=result, model=self.analyzer.model)
 
                 logger.info(
-                    "✅ [%s | ID %d | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
+                    "✅ [%s | ID %d | %s | %s] '%s' -> Скор: %+.2f (%s) | Горизонт: %dч (Откат: %s) | Канал: %s",
                     self.worker_id,
                     news_id,
+                    market,
                     source,
                     title[:35],
                     result.sentiment_score,

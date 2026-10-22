@@ -100,8 +100,8 @@ async def test_analyze_article_context_overflow_retry(monkeypatch):
     analyzer = SentimentAnalyzer()
     calls = []
 
-    async def mock_run_analysis(title, content, source, categories, max_chars):
-        calls.append(max_chars)
+    async def mock_run_analysis(title, content, source, categories, max_chars, market="crypto"):
+        calls.append((max_chars, market))
         if len(calls) == 1:
             # Имитируем ошибку Ollama 400 превышения контекста
             response = httpx.Response(
@@ -148,5 +148,7 @@ async def test_analyze_article_context_overflow_retry(monkeypatch):
     assert len(calls) == 2
     from config import settings
 
-    assert calls[0] == settings.max_content_chars  # Первый вызов со стандартным лимитом
-    assert calls[1] == 2000  # Повторный вызов с адаптивным усечением до 2000 символов
+    assert calls[0][0] == settings.max_content_chars  # Первый вызов со стандартным лимитом
+    assert calls[1][0] == 2000  # Повторный вызов с адаптивным усечением до 2000 символов
+    assert calls[0][1] == "crypto"
+    assert calls[1][1] == "crypto"

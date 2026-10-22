@@ -35,19 +35,20 @@ func main() {
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 
+	activeSources := sources.GetSources(cfg.Market)
+	fmt.Printf("[Collector] Сервис запущен. Рынок: %s | Источников: %d | Периодичность опроса: %v\n", cfg.Market, len(activeSources), cfg.PollInterval)
+
 	// Первый запуск сбора сразу при старте приложения
-	runCollection(repo)
+	runCollection(repo, activeSources)
 
 	// Периодический запуск по таймеру
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
 
-	fmt.Printf("[Collector] Сервис запущен. Периодичность опроса: %v\n", cfg.PollInterval)
-
 	for {
 		select {
 		case <-ticker.C:
-			runCollection(repo)
+			runCollection(repo, activeSources)
 		case sig := <-stopChan:
 			fmt.Printf("\n[Collector] Получен сигнал %v. Завершение работы...\n", sig)
 			return
@@ -56,14 +57,14 @@ func main() {
 }
 
 // runCollection запускает один цикл параллельного сбора новостей со всех активных источников.
-func runCollection(repo *database.Repository) {
-	fmt.Printf("\n[Collector] === Запуск цикла сбора (%s) ===\n", time.Now().UTC().Format(time.RFC3339))
+func runCollection(repo *database.Repository, activeSources []model.Source) {
+	fmt.Printf("\n[Collector] === Запуск цикла сбора (%s) [Источников: %d] ===\n", time.Now().UTC().Format(time.RFC3339), len(activeSources))
 
 	ch := make(chan model.NewsItem, channelSize)
 	var wg sync.WaitGroup
 
 	// Конкурентный запуск воркеров на каждый источник
-	for _, src := range sources.Active {
+	for _, src := range activeSources {
 		wg.Add(1)
 		go parser.FetchFeed(src, ch, &wg)
 	}

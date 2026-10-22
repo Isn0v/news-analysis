@@ -38,12 +38,13 @@ async def test_single_article(news_id: int):
         return
 
     n_id = article["id"]
+    market = article.get("market") or "crypto"
     title = article["title"]
     content = article["content"]
     desc = article["description"]
     source = article["source"]
     cats = article["categories"]
-    print(f"\n📰 Анализ статьи ID {n_id}: {title}")
+    print(f"\n📰 Анализ статьи ID {n_id} [{market.upper()}]: {title}")
     print(f"🌐 Провайдер: {settings.llm_base_url} | Модель: {settings.llm_model}")
     print("⏳ Отправка запроса к модели по токену...")
 
@@ -51,9 +52,10 @@ async def test_single_article(news_id: int):
     try:
         res = await analyzer.analyze_article(
             title=title,
-            content=content or desc,
+            content=content or desc or title,
             source=source,
             categories=cats or [],
+            market=market,
         )
         print("\n✅ Успешный ответ модели:")
         print(json.dumps(res.model_dump(), indent=2, ensure_ascii=False))
@@ -68,9 +70,13 @@ def main():
     parser.add_argument("--token", "--api-key", dest="api_key", type=str, help="API токен (Groq / OpenAI / Cloud API)")
     parser.add_argument("--model", type=str, help="Имя модели (например, llama-3.3-70b-versatile)")
     parser.add_argument("--base-url", type=str, help="URL эндпоинта (например, https://api.groq.com/openai/v1)")
+    parser.add_argument("--market", type=str, help="Фильтрация очереди по рынку (moex, crypto, all)")
     parser.add_argument("--test-id", type=int, help="Протестировать токен на 1 статье по ID без запуска демона")
 
     args = parser.parse_args()
+
+    if args.market:
+        settings.target_market = args.market.lower().strip()
 
     if args.api_key:
         settings.llm_api_key = args.api_key
