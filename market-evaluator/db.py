@@ -203,8 +203,9 @@ class DatabaseManager:
                 target_ret_saved = detail.get("target_return_pct")
                 target_ret_saved = float(target_ret_saved) if target_ret_saved is not None else None
 
-                is_bullish = lbl == "bullish" or sentiment_score > 0.1
-                is_bearish = lbl == "bearish" or sentiment_score < -0.1
+                score_thresh = settings.sentiment_score_threshold
+                is_bullish = lbl == "bullish" or sentiment_score > score_thresh
+                is_bearish = lbl == "bearish" or sentiment_score < -score_thresh
 
                 def to_float(val: Any) -> float | None:
                     return float(val) if val is not None else None
@@ -222,7 +223,7 @@ class DatabaseManager:
                 elif is_bearish:
                     is_impulse_confirmed = initial_drawdown <= -thresh
                 else:
-                    is_impulse_confirmed = initial_volatility <= (thresh * 2.0)
+                    is_impulse_confirmed = initial_volatility <= (thresh * settings.neutral_volatility_multiplier)
 
                 # 2. Направленная согласованность (Directional Alignment)
                 def check_alignment(ret: float | None, is_bull: bool, is_bear: bool) -> bool | None:

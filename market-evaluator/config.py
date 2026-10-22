@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     post_window_hours: int = 24  # Окно ПОСЛЕ новости (для оценки тренда)
     candle_interval: str = "15m"  # Таймфрейм свечей (15m, 5m, 1h)
     neutral_threshold_pct: float = 0.5  # Порог отнесения движения к нейтральному (+-0.5%)
+    neutral_volatility_multiplier: float = 2.0  # Множитель диапазона волатильности для нейтральных новостей (High-Low размах)
+    sentiment_score_threshold: float = 0.1  # Порог скора для разделения на directional/neutral
+    impulse_window_hours: int = 2  # Окно оценки первичного импульса (часы)
     min_news_age_hours: float = 4.0  # Минимальный возраст новости для оценки в воркере
 
     # Параметры воркера

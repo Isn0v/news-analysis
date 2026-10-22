@@ -91,11 +91,14 @@ class EventStudyEngine:
         max_drawdown_pct = ((min_low - p0) / p0) * 100.0
         volatility_range_pct = ((max_high - min_low) / p0) * 100.0
 
-        # 5. Оценка подтверждения первичного импульса (строго в окне первых 2 часов от t0)
+        # 5. Оценка подтверждения первичного импульса (в окне impulse_window_hours от t0)
         thresh = settings.neutral_threshold_pct
+        score_thresh = settings.sentiment_score_threshold
         lbl = sentiment_label.lower()
+        is_bullish_signal = lbl == "bullish" or sentiment_score > score_thresh
+        is_bearish_signal = lbl == "bearish" or sentiment_score < -score_thresh
 
-        impulse_window_ms = 2 * 60 * 60 * 1000
+        impulse_window_ms = settings.impulse_window_hours * 60 * 60 * 1000
         impulse_candles = [
             c for c in post_candles
             if (int(c.timestamp.timestamp() * 1000) - t0_ms) <= impulse_window_ms
@@ -109,21 +112,21 @@ class EventStudyEngine:
         initial_drawdown_pct = ((initial_low - p0) / p0) * 100.0
         initial_volatility_range_pct = ((initial_high - initial_low) / p0) * 100.0
 
-        if lbl == "bullish" or sentiment_score > 0.1:
+        if is_bullish_signal:
             is_impulse_confirmed = initial_runup_pct >= thresh
-        elif lbl == "bearish" or sentiment_score < -0.1:
+        elif is_bearish_signal:
             is_impulse_confirmed = initial_drawdown_pct <= -thresh
         else:
-            # Для нейтральных событий: отсутствие аномального размаха в первые 2 часа
-            is_impulse_confirmed = initial_volatility_range_pct <= (thresh * 2.0)
+            # Для нейтральных событий: отсутствие аномального размаха в окне импульса
+            is_impulse_confirmed = initial_volatility_range_pct <= (thresh * settings.neutral_volatility_multiplier)
 
         # 6. Проверка согласованности направления (Directional Alignment)
         def check_alignment(ret: float | None) -> bool | None:
             if ret is None:
                 return None
-            if lbl == "bullish" or sentiment_score > 0.1:
+            if is_bullish_signal:
                 return ret > thresh
-            elif lbl == "bearish" or sentiment_score < -0.1:
+            elif is_bearish_signal:
                 return ret < -thresh
             else:  # neutral
                 return abs(ret) <= thresh
@@ -151,7 +154,7 @@ class EventStudyEngine:
         trajectory = "NO_IMPULSE"
         retrace_pct = 0.0
 
-        if is_impulse_confirmed and (lbl == "bullish" or sentiment_score > 0.1):
+        if is_impulse_confirmed and is_bullish_signal:
             if target_ret is not None and target_ret >= thresh:
                 trajectory = "CONTINUATION"
             elif target_ret is not None and initial_runup_pct > 0:
@@ -159,7 +162,7 @@ class EventStudyEngine:
                 trajectory = "FADED" if retrace_pct >= 50.0 or target_ret <= (thresh * 0.5) else "CONTINUATION"
             else:
                 trajectory = "FADED"
-        elif is_impulse_confirmed and (lbl == "bearish" or sentiment_score < -0.1):
+        elif is_impulse_confirmed and is_bearish_signal:
             if target_ret is not None and target_ret <= -thresh:
                 trajectory = "CONTINUATION"
             elif target_ret is not None and initial_drawdown_pct < 0:
@@ -173,10 +176,7 @@ class EventStudyEngine:
         elif (
             not is_impulse_confirmed
             and target_ret is not None
-            and (
-                ((lbl == "bullish" or sentiment_score > 0.1) and target_ret <= -thresh)
-                or ((lbl == "bearish" or sentiment_score < -0.1) and target_ret >= thresh)
-            )
+            and ((is_bullish_signal and target_ret <= -thresh) or (is_bearish_signal and target_ret >= thresh))
         ):
             trajectory = "ADVERSE"
 
